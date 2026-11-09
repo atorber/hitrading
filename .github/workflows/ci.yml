@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-          cache: npm
+          # 无运行时依赖（peer 由 Harness profile 提供），无 lockfile，不启用 npm 缓存
 
       - name: 语法检查（node --check 全部 JS）
         run: |
