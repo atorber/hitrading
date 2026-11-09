@@ -1,0 +1,4 @@
+- insert:
+    - id: hitrading
+      name: '@atorber/hitrading'
+      config: {}

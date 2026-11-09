@@ -1,0 +1,44 @@
+{
+  "name": "@atorber/hitrading",
+  "version": "1.0.0",
+  "description": "HiTrading — A股投资助手插件（DeepSeek Harness）：11 个 Agent 工具 + 11-Tab 交互控制台（行情自选/量能/强势股/选股/持仓/回测/资讯/预警/Agent 技能/API/使用说明），SQLite 持久化，纯分析不下单。",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": ["index.js", "client.js", "server.js", "lib/*.js", "skills/**/*.md", "cordis.patch.yml", "locale/*.json", "icon.svg"],
+  "scripts": {
+    "start:api": "node server.js"
+  },
+  "keywords": [
+    "dsh", "deepseek-harness", "cordis", "cordis-plugin", "plugin",
+    "a-share", "stock", "quant", "trading", "hitrading"
+  ],
+  "author": "atorber",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atorber/hitrading.git"
+  },
+  "bugs": {
+    "url": "https://github.com/atorber/hitrading/issues"
+  },
+  "homepage": "https://github.com/atorber/hitrading#readme",
+  "peerDependencies": {
+    "@deepseek-ai/dsh-tools": "^0.2.2-rc.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": ["@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-ui-sidebar"]
+    }
+  }
+}
