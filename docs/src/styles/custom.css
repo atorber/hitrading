@@ -47,29 +47,52 @@
   font-size: 0.85rem;
 }
 
-/* 首页功能卡片 */
-.feature-grid {
+/* 首页功能卡片：六卡等高。
+   注意：Starlight 有全局规则 `.sl-markdown-content :not(...)+:not(...){margin-top:1rem}`
+   会给相邻块级元素加 16px 上边距（导致卡片错位、行高不齐），必须在这里压掉。 */
+.sl-markdown-content .feature-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  grid-auto-rows: 1fr;
   gap: 0.9rem;
   margin: 1.5rem 0;
 }
-.feature-card {
+.sl-markdown-content .feature-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--sl-color-gray-5);
   border-radius: 12px;
   padding: 0.95rem 1.05rem;
   background: var(--sl-color-bg-nav);
+  align-self: stretch;
+  height: 100%;
+  box-sizing: border-box;
+  margin: 0 !important;
 }
-.feature-card h3 {
-  margin: 0 0 0.3rem;
+.sl-markdown-content .feature-card h3 {
+  margin: 0 0 0.35rem;
   font-size: 0.98rem;
+  line-height: 1.4;
   color: var(--sl-color-white);
 }
-.feature-card p {
+.sl-markdown-content .feature-card p {
   margin: 0;
   font-size: 0.85rem;
   line-height: 1.55;
   color: var(--sl-color-gray-3);
+  flex: 1;
+}
+@media (max-width: 50rem) {
+  .feature-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 30rem) {
+  .feature-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* 数字指标（首页） */
