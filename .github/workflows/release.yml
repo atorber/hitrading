@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 发布（打包 + GitHub Release）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: 语法检查
+        run: |
+          for f in index.js client.js server.js lib/*.js; do node --check "$f"; done
+
+      - name: 打包（npm pack）
+        run: |
+          npm pack
+          mv ./*.tgz hitrading.tgz
+          ls -la hitrading.tgz
+
+      - name: 准备 Release 说明
+        run: |
+          TAG="${GITHUB_REF_NAME:-v1.0.0}"
+          echo "VERSION=$TAG" >> "$GITHUB_ENV"
+          # 优先取 tag 注释主体；取不到则用默认模板（正文细节交给 generate_release_notes 自动生成）
+          BODY="$(git tag -l --format='%(contents:body)' "$TAG" 2>/dev/null || true)"
+          if [ -z "$BODY" ]; then
+            BODY='HiTrading 发布。
+
+          **安装**：对 DeepSeek Harness 说「帮我安装 GitHub 插件 https://github.com/atorber/hitrading」。'
+          fi
+          printf '%s\n' "$BODY" > RELEASE_BODY.md
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ env.VERSION }}
+          body_path: RELEASE_BODY.md
+          files: hitrading.tgz
+          generate_release_notes: true

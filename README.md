@@ -1,5 +1,7 @@
 # HiTrading — A股投资助手插件
 
+[![CI](https://github.com/atorber/hitrading/actions/workflows/ci.yml/badge.svg)](https://github.com/atorber/hitrading/actions/workflows/ci.yml) [![Release](https://github.com/atorber/hitrading/actions/workflows/release.yml/badge.svg)](https://github.com/atorber/hitrading/releases)
+
 运行在当前 DeepSeek Harness 内的 Cordis 插件。为 Agent 提供 **11 个 A股工具**，并在 Web GUI 左侧栏挂出 **HiTrading 交互控制台**（11 个 Tab，所有模块都有 UI）。
 
 > 纯分析与跟踪，**不连接券商、不真实下单**；所有结论附投资风险提示，数据来自公开免费接口。
