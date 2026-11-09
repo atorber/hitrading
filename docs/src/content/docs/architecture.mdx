@@ -1,0 +1,59 @@
+---
+title: 架构与数据
+description: 插件结构、数据流与持久化
+---
+
+import Mermaid from '../../components/Mermaid.astro';
+
+HiTrading 是一个 Cordis bundle：Host 侧注册工具与路由，Client 侧注册侧栏图标与控制台，独立进程提供 HTTP 服务，三者共用一套操作实现。
+
+<Mermaid caption="Host / Client / 独立服务共用 lib/ops.js 单一真相源" code={`graph TD
+  A[Agent 对话] --> B[11 个 Host 工具]
+  C[Web GUI 控制台] --> D[/api/hitrading 鉴权路由/]
+  E[外部程序 Python / R] --> F[server.js :8099]
+  B --> G[lib/ops.js 单一真相源]
+  D --> G
+  F --> G
+  G --> H[(SQLite hitrading.db)]
+  G --> I[公开数据接口 腾讯 / 新浪 / 东财]`} />
+
+## 目录结构
+
+```
+index.js            Host 入口：工具 + /api/hitrading 路由 + 定时器
+client.js           Client 入口：侧栏图标 + 11-Tab 控制台
+server.js           独立本地 HTTP 服务
+lib/ops.js          单一真相源：全部操作
+lib/db.js           SQLite 存储（WAL + 每小时备份）
+lib/*.js            数据适配（行情/K线/量能/强势股/资讯/回测/指标）
+cordis.patch.yml    Loader 插入行
+locale/*.json       中英双语标题与描述
+skills/hitrading/   SKILL.md（给其他 Agent 的技能包）
+```
+
+## 数据源
+
+| 数据 | 来源 |
+| --- | --- |
+| 实时行情 | 腾讯 `qt.gtimg.cn`（主）+ 新浪（兜底） |
+| 日K / 分钟K | 新浪 `quotes.sina.cn` |
+| 全市场列表 | 新浪 `Market_Center` |
+| 指数日K（量能） | 东方财富 `push2his` |
+| 涨幅榜 / 涨停池 | 东方财富 `push2` / `push2ex` |
+| 快讯 / 公告 / 龙虎榜 | 东方财富 datacenter |
+
+全部为公开免费接口，**可能存在延迟或误差**，不保证实时性与准确性。
+
+## 存储
+
+- SQLite（`node:sqlite` 内置驱动），WAL 模式 + `busy_timeout`，多进程共享
+- 表：`watchlist` / `positions` / `alerts` / `powerful`（按日缓存）
+- 每小时 `VACUUM INTO hitrading.db.bak` 快照；旧版 JSON 数据自动迁移
+
+## 刷新策略
+
+| 页面 | 频率 | 行为 |
+| --- | --- | --- |
+| 行情自选 / 持仓 | 15 秒 | 静默替换数据，表格不重挂 |
+| 量能 / 强势股 | 60 秒 | 同上 |
+| 资讯 / 预警 | 手动 | — |

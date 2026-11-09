@@ -1,0 +1,24 @@
+---
+// 关键页面截图：静态导入走 Astro 资源管线（自动加 base、生成尺寸）
+import overview from '../assets/screenshots/overview.png';
+import energy from '../assets/screenshots/energy.png';
+import powerful from '../assets/screenshots/powerful.png';
+import screen from '../assets/screenshots/screen.png';
+import portfolio from '../assets/screenshots/portfolio.png';
+import backtest from '../assets/screenshots/backtest.png';
+import news from '../assets/screenshots/news.png';
+import alerts from '../assets/screenshots/alerts.png';
+import skills from '../assets/screenshots/skills.png';
+import api from '../assets/screenshots/api.png';
+import guide from '../assets/screenshots/guide.png';
+
+const shots = { overview, energy, powerful, screen, portfolio, backtest, news, alerts, skills, api, guide };
+
+const { name, alt, caption } = Astro.props;
+const img = shots[name];
+if (!img) throw new Error(`Unknown screenshot: ${name}`);
+---
+<figure class="shot">
+  <img src={img.src} width={img.width} height={img.height} alt={alt} loading="lazy" />
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>

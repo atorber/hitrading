@@ -1,0 +1,69 @@
+---
+title: HiTrading — A股投资助手
+description: DeepSeek Harness 插件：11 个 Agent 工具 + 11-Tab 交互控制台，A股行情、量能、强势股、选股、持仓与回测，纯分析不下单。
+template: splash
+hero:
+  tagline: 选赛道，做减法，精选股
+  actions:
+    - text: 快速安装
+      link: /hitrading/install/
+      icon: right-arrow
+    - text: 浏览器版截图
+      link: /hitrading/guide/overview/
+      variant: minimal
+      icon: laptop
+---
+
+import Shot from '../../components/Shot.astro';
+
+HiTrading 是一个运行在 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 内的 A股研究插件：**11 个 Agent 工具**让模型直接查行情、算指标、跑回测；**11-Tab 交互控制台**让这些能力在 Web GUI 里点得出来；外加一个**本地 HTTP API**，供 Python / R 等外部脚本调用。
+
+> 纯分析与跟踪，**不连接券商、不真实下单**。数据来自公开免费接口，可能存在延迟或误差，仅供研究参考。
+
+<Shot name="overview" alt="HiTrading 控制台 · 行情自选页" caption="行情自选：实时行情表 + 关注度分级 + 多标签筛选 + T-n 累计涨跌幅" />
+
+<div class="stat-row">
+  <div class="stat"><b>11</b><span>Agent 工具</span></div>
+  <div class="stat"><b>11</b><span>控制台 Tab</span></div>
+  <div class="stat"><b>12</b><span>HTTP API 操作</span></div>
+  <div class="stat"><b>0</b><span>券商连接 / 下单</span></div>
+</div>
+
+## 能做什么
+
+<div class="feature-grid">
+  <div class="feature-card">
+    <h3>市场量能</h3>
+    <p>沪深京三市日成交额（亿元）趋势、MA5、放量/缩量判定，20/40/60 交易日区间切换。</p>
+  </div>
+  <div class="feature-card">
+    <h3>强势股</h3>
+    <p>最近 10 个交易日每日涨幅 &gt; 7% 的股票，左侧日期切换，附涨停连板、首封时间与行业。</p>
+  </div>
+  <div class="feature-card">
+    <h3>自选与标签</h3>
+    <p>关注度三级（基础/精选/交易）+ 多标签，表头多选筛选，T-1 至 T-30 累计涨跌幅一屏看完。</p>
+  </div>
+  <div class="feature-card">
+    <h3>选股与回测</h3>
+    <p>全市场排序叠加区间过滤；双均线 / MACD / RSI 策略回测，出权益曲线与胜率。</p>
+  </div>
+  <div class="feature-card">
+    <h3>持仓与预警</h3>
+    <p>本地持仓盈亏（不连券商），价格/涨跌幅阈值预警，交易时段由定时器巡检。</p>
+  </div>
+  <div class="feature-card">
+    <h3>对话即调用</h3>
+    <p>在聊天里说「看看今天放量还是缩量」，Agent 自动调用对应工具并给出结果。</p>
+  </div>
+</div>
+
+## 三种用法
+
+1. **控制台** — 左侧栏点 HiTrading 图标，11 个 Tab 直接点选操作。
+2. **对话** — 在聊天框直接说需求，Agent 调用工具返回结果。
+3. **外部程序** — 随插件自动启动的 `127.0.0.1:8099` HTTP 服务，供量化脚本读写。
+
+三者读写的是**同一份数据**（本机 SQLite），任意一处修改其余立即可见。
+
+[开始安装 →](/hitrading/install/)

@@ -1,0 +1,73 @@
+---
+title: HTTP API
+description: 本地 HTTP 服务 127.0.0.1:8099 的接口说明
+---
+
+import Shot from '../../components/Shot.astro';
+
+插件安装后自动拉起一个本地 HTTP 服务（`server.js`），供外部程序访问。控制台「API」Tab 有完整参数表与请求/响应示例。
+
+<Shot name="api" alt="API 文档页" caption="API：每个操作的参数表、curl 请求与响应示例" />
+
+## 服务
+
+| 项 | 值 |
+| --- | --- |
+| 地址 | `http://127.0.0.1:8099` |
+| 端口 | `HITRADING_PORT`（默认 8099） |
+| 鉴权 | `HITRADING_TOKEN`（设置后请求需带 token） |
+| 独立库 | `HITRADING_DB`（默认同 GUI 的 `~/.dsh/storages/hitrading.db`） |
+| 健康检查 | `GET /health` |
+| 技能包 | `GET /skill.md` |
+
+端口被占用时服务进程会干净退出，不影响 Harness。
+
+## 调用约定
+
+```bash
+# GET：参数放 query
+curl -s "http://127.0.0.1:8099/api?op=quote&symbols=600519,000001"
+
+# POST：op + args
+curl -s -X POST http://127.0.0.1:8099/api \
+  -H 'Content-Type: application/json' \
+  -d '{"op":"quote","args":{"symbols":["600519"]}}'
+```
+
+响应统一为 `{"ok":true,"value":...}`，失败为 `{"ok":false,"error":"..."}`。
+
+## 操作一览
+
+| op | 说明 | 主要参数 |
+| --- | --- | --- |
+| `suggest` | 证券模糊搜索 | `q`、`count` |
+| `quote` | 批量实时行情 | `symbols` |
+| `kline` | 历史 K线 | `symbol`、`period`、`limit` |
+| `analysis` | 技术面 + 估值 | `symbol` |
+| `energy` | 市场量能 | `days`(20/40/60) |
+| `powerful` | 强势股 | `date`(可选) |
+| `screen` | 全市场选股 | `sort`、`limit`、`peMin`… |
+| `watchlist.list` | 自选列表（含行情/T-n） | — |
+| `watchlist.add` | 加自选 | `symbols`、`tier`、`tags` |
+| `watchlist.remove` | 删自选 | `symbols` |
+| `watchlist.setTier` | 改关注度 | `symbols`、`tier` |
+| `watchlist.setTags` | 设标签（全量替换） | `symbols`、`tags` |
+| `portfolio.list` | 持仓（含市值盈亏） | — |
+| `portfolio.add` / `remove` | 建仓 / 清仓 | `symbol`、`shares`、`costPrice` |
+| `news` | 快讯/公告/龙虎榜 | `type`、`symbol`、`count` |
+| `backtest` | 策略回测 | `symbol`、`strategy`、`limit`… |
+| `alerts.list` / `create` / `delete` | 预警规则 | `symbol`、`condition`、`value` |
+
+## 示例：读取量能并落盘
+
+```python
+import requests
+
+r = requests.get("http://127.0.0.1:8099/api", params={"op": "energy", "days": 20}).json()
+stats = r["value"]["stats"]
+print(stats["date"], stats["total"], stats["status"])
+```
+
+:::tip[与管理端一致]
+HTTP 服务、控制台、Agent 工具共用 `lib/ops.js` 同一套实现，读写的是同一份 SQLite，不会出现口径不一致。
+:::

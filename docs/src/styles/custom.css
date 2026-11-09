@@ -1,0 +1,97 @@
+/* HiTrading 官网自定义样式 */
+
+/* 截图 */
+.shot {
+  margin: 1.75rem 0;
+}
+.shot img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 10px;
+  border: 1px solid var(--sl-color-gray-5);
+  box-shadow: 0 10px 34px rgba(16, 24, 40, 0.14);
+}
+.shot figcaption {
+  margin-top: 0.6rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--sl-color-gray-3);
+}
+
+/* Mermaid 架构图 */
+.mermaid-fig {
+  margin: 1.5rem 0;
+}
+.mermaid {
+  overflow: auto;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--sl-color-gray-5);
+  background: #ffffff;
+}
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+.mermaid-fig figcaption {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--sl-color-gray-3);
+}
+.mermaid-error {
+  color: var(--sl-color-red);
+  font-size: 0.85rem;
+}
+
+/* 首页功能卡片 */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: 0.9rem;
+  margin: 1.5rem 0;
+}
+.feature-card {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 12px;
+  padding: 0.95rem 1.05rem;
+  background: var(--sl-color-bg-nav);
+}
+.feature-card h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.98rem;
+  color: var(--sl-color-white);
+}
+.feature-card p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--sl-color-gray-3);
+}
+
+/* 数字指标（首页） */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin: 1.5rem 0;
+}
+.stat {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 10px;
+  padding: 0.8rem 0.95rem;
+}
+.stat b {
+  display: block;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  color: var(--sl-color-white);
+  font-variant-numeric: tabular-nums;
+}
+.stat span {
+  font-size: 0.8rem;
+  color: var(--sl-color-gray-3);
+}

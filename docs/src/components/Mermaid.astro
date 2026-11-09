@@ -1,0 +1,19 @@
+---
+// 架构图：构建期用 beautiful-mermaid 渲染成 SVG（零客户端 JS）
+import { renderMermaidSVG } from 'beautiful-mermaid';
+
+const { code, caption } = Astro.props;
+let svg = '';
+let error = '';
+try {
+  svg = renderMermaidSVG(code, { bg: 'transparent', fg: '#24292f', transparent: true });
+} catch (e) {
+  error = e instanceof Error ? e.message : String(e);
+}
+---
+<figure class="mermaid-fig">
+  {error
+    ? <pre class="mermaid-error">Mermaid render failed: {error}</pre>
+    : <div class="mermaid" set:html={svg} />}
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>

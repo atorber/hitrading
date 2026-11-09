@@ -1,0 +1,57 @@
+---
+title: 安装
+description: 在 DeepSeek Harness 中安装 HiTrading 插件
+---
+
+## 要求
+
+- DeepSeek Harness **≥ 0.2.2-rc.1**
+- 能访问公网（行情/K线/资讯来自公开接口）
+
+## 从 GitHub 安装（推荐）
+
+对 Harness 的对话框说：
+
+> 帮我安装 GitHub 上的插件：https://github.com/atorber/hitrading
+
+或让它通过 `plugin_manager` 安装（`install_bundle`，target 填 `https://github.com/atorber/hitrading`）。安装程序会自动拉取仓库、解析 `@deepseek-ai/dsh-tools` peer 依赖并应用插件补丁。
+
+安装完成后：
+
+- 左侧栏出现 **HiTrading** 图标，点开即控制台
+- 对话中可用 11 个 `hitrading_*` 工具
+- 本地 HTTP 服务在 `http://127.0.0.1:8099` 自动启动（EADDRINUSE 时自动退出，不冲突）
+
+:::tip[版本固定]
+想锁定版本可把 target 换成 tag 地址：`https://github.com/atorber/hitrading/releases/tag/v1.0.0`
+:::
+
+## 从本地目录安装（开发）
+
+```bash
+git clone https://github.com/atorber/hitrading.git
+# 在 Harness 内：plugin_manager install_bundle，target 填仓库绝对路径
+```
+
+本地 `link:` 安装时 Node 会从插件真实路径向上解析 `node_modules`，插件目录不在 DSH 安装树内，如需 `import '@deepseek-ai/dsh-tools'` 请在插件目录建软链：
+
+```bash
+cd hitrading
+mkdir -p node_modules
+DSH_NPM_ROOT=$(dirname "$(dirname "$(readlink -f "$(which dsh)")")")/node_modules
+ln -sfn "$DSH_NPM_ROOT/@deepseek-ai" node_modules/@deepseek-ai
+```
+
+该软链已列入 `.gitignore`。从 GitHub / registry 正常安装时会由 pnpm 按 `peerDependencies` 自动处理后端依赖，无需此步骤。
+
+## 数据存放
+
+| 内容 | 位置 |
+| --- | --- |
+| 自选 / 持仓 / 预警 / 强势股缓存 | `~/.dsh/storages/hitrading.db`（SQLite，WAL） |
+| 每小时快照 | `hitrading.db.bak`（`VACUUM INTO`） |
+| 服务端口 / 鉴权 / 独立库 | 环境变量 `HITRADING_PORT` / `HITRADING_TOKEN` / `HITRADING_DB` |
+
+## 卸载
+
+在 Harness 内用 `plugin_manager remove_bundle` 移除 `@atorber/hitrading`。数据库文件保留在 `~/.dsh/storages/`，自行删除即可。

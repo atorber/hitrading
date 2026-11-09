@@ -1,0 +1,49 @@
+---
+title: Agent 工具
+description: 11 个 hitrading_* 工具与对话示例
+---
+
+import Shot from '../../components/Shot.astro';
+
+所有能力在对话里都能直接用——模型会自动选择工具并组织结果。控制台里「Agent 技能」Tab 列出全部工具的**可复制提示词**，点「试用」还能新开会话并预填。
+
+<Shot name="skills" alt="Agent 技能页" caption="Agent 技能：每个工具配两句示例提示词，可复制或一键试用" />
+
+## 工具清单
+
+| 工具 | 能做什么 | 示例 |
+| --- | --- | --- |
+| `hitrading_quote` | 批量实时行情（现价/涨跌幅/PE/PB/市值/换手） | 查一下 600519 和 000001 的行情 |
+| `hitrading_kline` | 历史 K线（日/周/月/分钟） | 看 600519 最近 60 根日K |
+| `hitrading_analysis` | 技术面（MA/MACD/RSI/KDJ）+ 估值概览 | 分析一下 600519 |
+| `hitrading_market_energy` | 沪深京日成交额与量能状态 | 今天市场是放量还是缩量？ |
+| `hitrading_powerful` | 最近 10 交易日每日涨幅 >7% 的股票 | 看看 11 月 6 日的强势股 |
+| `hitrading_screen` | 全市场排序 + 区间过滤选股 | 筛选涨跌幅超 5% 且换手率超 3% 的股票 |
+| `hitrading_watchlist` | 自选股增删查、关注度、标签 | 把 600519 加入自选 |
+| `hitrading_portfolio` | 本地持仓与盈亏 | 记录持仓 600519 100股 成本1400 |
+| `hitrading_news` | 快讯 / 公告 / 龙虎榜 | 看看今日龙虎榜 |
+| `hitrading_backtest` | 双均线 / MACD / RSI 策略回测 | 回测 600519 双均线策略 |
+| `hitrading_alert` | 价格/涨跌幅预警规则 | 设置 600519 上破 1500 时提醒 |
+
+## 输出形态
+
+每个工具都返回结构化 JSON + 一份可读摘要（Markdown 表格）。例如 `hitrading_market_energy`：
+
+```
+## 市场量能（最近 20 个交易日）
+最新交易日 2026-11-09：沪深京合计 14947.2 亿（较前日 -1770.7 亿），
+5 日均额 18139.3 亿，量能状态「缩量」（较 5 日均额 -17.6%）。
+...
+```
+
+## 给其他 Agent 装技能包
+
+插件自带一份 `SKILL.md`（含全部接口、示例与任务配方），安装后服务会直接托管：
+
+```bash
+curl -o <技能目录>/hitrading/SKILL.md http://127.0.0.1:8099/skill.md
+```
+
+或者把这句话发给目标 Agent：
+
+> 请把 http://127.0.0.1:8099/skill.md 安装到你的 skills 目录（例如 `~/.agents/skills/hitrading/SKILL.md`），然后按其中的说明使用 A股能力。

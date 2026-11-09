@@ -1,0 +1,40 @@
+---
+title: 控制台总览
+description: HiTrading 控制台的 11 个 Tab 与整体布局
+---
+
+import Shot from '../../../components/Shot.astro';
+
+左侧栏点 **HiTrading** 图标打开控制台。顶部是服务状态（`:8099` 运行中 + 启动/停止/重启），下面分两组 Tab：
+
+| 分组 | Tab | 一句话 |
+| --- | --- | --- |
+| 工作区 | 行情自选 | 实时行情表、关注度与标签筛选、T-n 涨跌幅 |
+| 工作区 | [量能](/hitrading/guide/energy/) | 沪深京成交额趋势与放量/缩量判定 |
+| 工作区 | [强势股](/hitrading/guide/powerful/) | 按交易日看涨幅 > 7% 的股票 |
+| 工作区 | [选股](/hitrading/guide/screen/) | 全市场排序 + 区间过滤 |
+| 工作区 | [持仓](/hitrading/guide/portfolio-backtest/) | 本地持仓市值与盈亏 |
+| 工作区 | [回测](/hitrading/guide/portfolio-backtest/) | 三种内置策略的历史回测 |
+| 工作区 | [资讯](/hitrading/guide/news-alerts/) | 快讯 / 公告 / 龙虎榜 |
+| 工作区 | [预警](/hitrading/guide/news-alerts/) | 价格与涨跌幅阈值提醒 |
+| 参考 | [Agent 技能](/hitrading/tools/) | 11 个工具的可复制提示词 |
+| 参考 | [API](/hitrading/http-api/) | 本地 HTTP 接口文档 |
+| 参考 | [使用说明](/hitrading/faq/) | 上手引导与数据说明 |
+
+## 全局约定
+
+- **红涨绿跌**：与 A股行情软件一致。
+- **数值右对齐 + 等宽数字**：表格里的价格、涨幅、金额都用 `tabular-nums` 对齐，便于纵向比较。
+- **静默刷新**：定时刷新只替换数据，不重挂表格——滚动位置、筛选、标签浮层都不受影响。
+- **刷新按钮**：每个页右上角的 ⟳ 可手动拉取；拉取中图标旋转。
+- **失败不丢数据**：刷新失败保留上一份数据，右上角显示「刷新失败」，悬停看原因。
+
+<Shot name="guide" alt="HiTrading 使用说明页" caption="「使用说明」Tab：整体引导、三种用法与数据来源" />
+
+## 服务状态与启停
+
+控制台头部常驻服务灯：绿点表示 `127.0.0.1:8099` 可用。旁边的 **启动 / 停止 / 重启** 按钮控制这个本地服务——外部程序（Python/R）通过它读写数据。
+
+:::note
+控制台本身不依赖该服务：即使服务停了，GUI 里的 Tab 仍通过 Harness 的鉴权路由工作。
+:::
