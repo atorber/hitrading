@@ -1475,6 +1475,132 @@ window.__ModuleLoader__.load({
     }
 
     // ---------- 资讯 ----------
+    // ---------- 龙虎榜（独立 Tab） ----------
+    function LhbView() {
+      const [onlyWatch, setOnlyWatch] = useState(false);
+      const [sort, setSort] = useState({ key: null, dir: null });
+      const [adding, setAdding] = useState(null);
+      const data = useData(() => api('news', { type: 'lhb', count: 50 }), [], { refreshMs: 60_000 });
+      const watch = useData(() => api('watchlist.list'), [], { refreshMs: 60000 });
+      const items = data.value?.items || [];
+
+      const quickAdd = async (code) => {
+        const c = String(code ?? '').trim();
+        if (!/^\d{6}$/.test(c)) { notifyError(`无效代码：${code}`); return; }
+        if (adding === c) return;
+        setAdding(c);
+        try {
+          const v = await api('watchlist.add', { symbols: [c] });
+          if (v.added?.length) notifyOk(`已加入自选：${c}`);
+          else notifyWarn(`${c} 已在自选`);
+        } catch (e) { notifyError(`加入自选失败：${e.message}`); }
+        finally { setAdding(null); }
+      };
+      const yi = (v) => (v / 1e8).toFixed(2);
+      const pct = (v) => (v == null ? '-' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`);
+
+      const watchRows = watch.value?.items || [];
+      const watchCodes = new Set(watchRows.map((w) => w.symbol));
+      const watchNames = watchRows.map((w) => w.name).filter((n) => n && n.length >= 2);
+      const isWatched = (r) => watchCodes.has(String(r.code)) || watchNames.some((n) => (r.title || '').includes(n));
+      const itemsFiltered = onlyWatch ? items.filter(isWatched) : items;
+
+      const lhbAgg = (() => {
+        const map = new Map();
+        for (const it of itemsFiltered) {
+          const cur = map.get(it.code);
+          if (!cur) { map.set(it.code, { ...it, reasons: [it.reason || '—'] }); continue; }
+          if (it.reason && !cur.reasons.includes(it.reason)) cur.reasons.push(it.reason);
+          if (Math.abs(it.netBuyAmt) > Math.abs(cur.netBuyAmt)) { cur.netBuyAmt = it.netBuyAmt; cur.buyAmt = it.buyAmt; cur.sellAmt = it.sellAmt; }
+        }
+        const rows = [...map.values()];
+        const buyers = rows.filter((x) => x.netBuyAmt > 0).sort((a, b) => b.netBuyAmt - a.netBuyAmt);
+        const sellers = rows.filter((x) => x.netBuyAmt <= 0).sort((a, b) => a.netBuyAmt - b.netBuyAmt);
+        const dates = [...new Set(items.map((x) => x.date))].sort().reverse();
+        return { rows, buyers, sellers, dates };
+      })();
+      const topBuy = lhbAgg.buyers[0];
+      const topSell = lhbAgg.sellers[0];
+      const sumBuy = lhbAgg.buyers.reduce((a, b) => a + b.netBuyAmt, 0);
+      const sumSellAbs = Math.abs(lhbAgg.sellers.reduce((a, b) => a + b.netBuyAmt, 0));
+      const chartRows = [...lhbAgg.buyers.slice(0, 7), ...lhbAgg.sellers.slice(0, 5)].sort((a, b) => b.netBuyAmt - a.netBuyAmt);
+      const maxAbs = Math.max(1, ...chartRows.map((r) => Math.abs(r.netBuyAmt)));
+
+      const columns = [
+        { label: '名称', render: (r) => h('span', { style: { fontWeight: 600 } }, r.name) },
+        { label: '代码', render: (r) => h('span', { style: { fontVariantNumeric: 'tabular-nums', color: 'var(--dsw-alias-label-tertiary)' } }, r.code) },
+        { label: '收盘', render: (r) => r.close, align: 'right' },
+        { label: '涨跌幅', render: (r) => pct(r.changeRate), className: (r) => (r.changeRate >= 0 ? 'htx-up' : 'htx-down'), align: 'right' },
+        { label: '净买额(亿)', render: (r) => yi(r.netBuyAmt), className: (r) => (r.netBuyAmt >= 0 ? 'htx-up' : 'htx-down'), align: 'right', sortable: true, sortValue: (r) => r.netBuyAmt },
+        { label: '总成交(亿)', render: (r) => ((r.buyAmt + r.sellAmt) / 2 / 1e8).toFixed(2), align: 'right' },
+        { label: '换手%', render: (r) => r.turnover, align: 'right' },
+        { label: '上榜原因', render: (r) => h('div', { className: 'htx-reasonChips' }, r.reasons.slice(0, 3).map((x, i) => h('span', { key: i, className: 'htx-reasonChip', title: x }, x.length > 18 ? x.slice(0, 17) + '…' : x))) },
+        { label: '', render: (r) => h('button', { className: 'htx-btn htx-btnSm', disabled: adding === String(r.code), onClick: () => quickAdd(r.code) }, adding === String(r.code) ? '加入中…' : '+ 自选') },
+      ];
+      const onSort = (key) => setSort((s0) => (s0.key !== key ? { key, dir: 'desc' } : s0.dir === 'desc' ? { key, dir: 'asc' } : { key: null, dir: null }));
+      const sortCol = sort.key && sort.dir ? columns.find((c) => c.label === sort.key) : null;
+      const displayRows = sortCol && sortCol.sortValue
+        ? [...lhbAgg.rows].sort((a, b) => {
+            const va = sortCol.sortValue(a), vb = sortCol.sortValue(b);
+            if (va == null && vb == null) return 0;
+            if (va == null) return 1;
+            if (vb == null) return -1;
+            return sort.dir === 'asc' ? va - vb : vb - va;
+          })
+        : lhbAgg.rows;
+
+      return h('div', null,
+        h('div', { className: 'htx-toolbar' },
+          h('label', { className: 'htx-watchToggle', title: '只显示自选股相关的上榜个股' },
+            h('input', { type: 'checkbox', checked: onlyWatch, onChange: (e) => setOnlyWatch(e.target.checked) }),
+            '只看自选'),
+          h('span', { className: 'htx-meta' },
+            `龙虎榜 ${onlyWatch ? `${displayRows.length}/${items.length}` : items.length} 条`,
+            data.updatedAt ? ` · ${new Date(data.updatedAt).toLocaleTimeString('zh-CN', { hour12: false })}` : '',
+            data.error ? h('span', { className: 'htx-metaWarn', title: `刷新失败：${data.error}` }, ' · 刷新失败') : null),
+          h(RefreshBtn, { busy: data.refreshing, onClick: () => data.reload() })),
+        data.error ? h(ErrorBox, { error: data.error }) : data.loading && !items.length ? h(Spinner)
+          : !items.length ? h(Empty, { text: '暂无龙虎榜数据', hint: '换个时间再试' })
+          : onlyWatch && !itemsFiltered.length ? h(Empty, { text: '自选股相关的上榜个股暂无', hint: '关闭「只看自选」查看全部' })
+          : h('div', null,
+            h('div', { className: 'htx-sumCard' },
+              h('b', null, `${lhbAgg.rows.length} 家上榜`),
+              `（${lhbAgg.dates.length > 1 ? lhbAgg.dates.join('、') : lhbAgg.dates[0] || ''}）：机构/营业部合计`,
+              h('b', { className: 'htx-up' }, ` 净买 ${yi(sumBuy)} 亿`),
+              '、',
+              h('b', { className: 'htx-down' }, `净卖 ${yi(sumSellAbs)} 亿`),
+              '。资金分歧最大的是 ',
+              topBuy ? h('b', null, `${topBuy.name}（净买 ${yi(topBuy.netBuyAmt)} 亿，${pct(topBuy.changeRate)}）`) : null,
+              topBuy && topSell ? '；' : null,
+              topSell ? h('b', null, `${topSell.name}（净卖 ${yi(Math.abs(topSell.netBuyAmt))} 亿，${pct(topSell.changeRate)}）`) : null,
+              '。'),
+            h('div', { className: 'htx-metrics' },
+              h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '上榜家数'), h('p', { className: 'htx-metricValue' }, String(lhbAgg.rows.length))),
+              h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净买合计(亿)'), h('p', { className: 'htx-metricValue htx-up' }, yi(sumBuy))),
+              h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净卖合计(亿)'), h('p', { className: 'htx-metricValue htx-down' }, yi(sumSellAbs))),
+              topBuy ? h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净买王'), h('p', { className: 'htx-metricValue' }, topBuy.name)) : null,
+              topSell ? h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净卖王'), h('p', { className: 'htx-metricValue' }, topSell.name)) : null),
+            chartRows.length ? h('div', { className: 'htx-card' },
+              h('h3', { className: 'htx-cardTitle' }, '多空分歧榜（净买 ←→ 净卖，点行加入自选）'),
+              h('div', { className: 'htx-lhbChart' },
+                chartRows.map((r) => {
+                  const w = `${(Math.abs(r.netBuyAmt) / maxAbs * 50).toFixed(1)}%`;
+                  const buy = r.netBuyAmt > 0;
+                  return h('div', {
+                    key: `${r.code}-${r.reason}`, className: 'htx-lhbRow',
+                    title: adding === String(r.code) ? '加入中…' : '点击加入自选',
+                    style: adding === String(r.code) ? { opacity: 0.55, cursor: 'wait' } : undefined,
+                    onClick: () => quickAdd(r.code),
+                  },
+                    h('span', { className: 'htx-lhbName' }, r.name),
+                    h('div', { className: 'htx-lhbTrack' },
+                      h('div', { className: `htx-lhbBar ${buy ? 'buy' : 'sell'}`, style: { width: w } })),
+                    h('span', { className: `htx-lhbAmt ${buy ? 'htx-up' : 'htx-down'}` }, `${buy ? '+' : ''}${yi(r.netBuyAmt)} 亿`));
+                }))) : null,
+            displayRows.length ? h('div', { className: 'htx-card', style: { paddingTop: 10 } },
+              h(DataTable, { columns, rows: displayRows, getKey: (r) => `${r.code}-${r.reason}`, sort, onSortChange: onSort })) : null));
+    }
+
     function NewsView() {
       const [type, setType] = useState('news');
       const [symbol, setSymbol] = useState('');
@@ -1552,31 +1678,6 @@ window.__ModuleLoader__.load({
       const yi = (v) => (v / 1e8).toFixed(2);
       const pct = (v) => (v == null ? '-' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`);
 
-      // —— 龙虎榜：按代码聚合（同一股票可因多个原因上榜，金额为同日同一笔，不重复计）——
-      const lhbAgg = (() => {
-        if (type !== 'lhb') return { rows: [], buyers: [], sellers: [], dates: [] };
-        const map = new Map();
-        for (const it of itemsWatched) {
-          const cur = map.get(it.code);
-          if (!cur) { map.set(it.code, { ...it, reasons: [it.reason || '—'] }); continue; }
-          if (it.reason && !cur.reasons.includes(it.reason)) cur.reasons.push(it.reason);
-          if (Math.abs(it.netBuyAmt) > Math.abs(cur.netBuyAmt)) { cur.netBuyAmt = it.netBuyAmt; cur.buyAmt = it.buyAmt; cur.sellAmt = it.sellAmt; }
-        }
-        const rows = [...map.values()];
-        const buyers = rows.filter((x) => x.netBuyAmt > 0).sort((a, b) => b.netBuyAmt - a.netBuyAmt);
-        const sellers = rows.filter((x) => x.netBuyAmt <= 0).sort((a, b) => a.netBuyAmt - b.netBuyAmt);
-        const dates = [...new Set(items.map((x) => x.date))].sort().reverse();
-        return { rows, buyers, sellers, dates };
-      })();
-      const topBuy = lhbAgg.buyers[0];
-      const topSell = lhbAgg.sellers[0];
-      const sumBuy = lhbAgg.buyers.reduce((a, b) => a + b.netBuyAmt, 0);
-      const sumSellAbs = Math.abs(lhbAgg.sellers.reduce((a, b) => a + b.netBuyAmt, 0));
-      const chartRows = [
-        ...lhbAgg.buyers.slice(0, 7),
-        ...lhbAgg.sellers.slice(0, 5),
-      ].sort((a, b) => b.netBuyAmt - a.netBuyAmt);
-      const maxAbs = Math.max(1, ...chartRows.map((r) => Math.abs(r.netBuyAmt)));
 
       // —— 快讯：时间轴分组 ——
       const newsGroups = (() => {
@@ -1600,29 +1701,6 @@ window.__ModuleLoader__.load({
       // —— 公告：分类统计 ——
       const annStats = type === 'announcement' ? cats.map((c) => ({ ...c })) : [];
 
-      const columns = type === 'lhb' ? [
-        { label: '名称', render: (r) => h('span', { style: { fontWeight: 600 } }, r.name) },
-        { label: '代码', render: (r) => h('span', { style: { fontVariantNumeric: 'tabular-nums', color: 'var(--dsw-alias-label-tertiary)' } }, r.code) },
-        { label: '收盘', render: (r) => r.close, align: 'right' },
-        { label: '涨跌幅', render: (r) => pct(r.changeRate), className: (r) => (r.changeRate >= 0 ? 'htx-up' : 'htx-down'), align: 'right' },
-        { label: '净买额(亿)', render: (r) => yi(r.netBuyAmt), className: (r) => (r.netBuyAmt >= 0 ? 'htx-up' : 'htx-down'), align: 'right', sortable: true, sortValue: (r) => r.netBuyAmt },
-        { label: '总成交(亿)', render: (r) => ((r.buyAmt + r.sellAmt) / 2 / 1e8).toFixed(2), align: 'right' },
-        { label: '换手%', render: (r) => r.turnover, align: 'right' },
-        { label: '上榜原因', render: (r) => h('div', { className: 'htx-reasonChips' }, r.reasons.slice(0, 3).map((x, i) => h('span', { key: i, className: 'htx-reasonChip', title: x }, x.length > 18 ? x.slice(0, 17) + '…' : x))) },
-        { label: '', render: (r) => h('button', { className: 'htx-btn htx-btnSm', disabled: adding === String(r.code), onClick: () => quickAdd(r.code) }, adding === String(r.code) ? '加入中…' : '+ 自选') },
-      ] : null;
-      const [lhbSort, setLhbSort] = useState({ key: null, dir: null });
-      const onLhbSort = (key) => setLhbSort((s0) => (s0.key !== key ? { key, dir: 'desc' } : s0.dir === 'desc' ? { key, dir: 'asc' } : { key: null, dir: null }));
-      const lhbSortCol = type === 'lhb' && lhbSort.key && lhbSort.dir ? columns.find((c) => c.label === lhbSort.key) : null;
-      const lhbRows = lhbSortCol && lhbSortCol.sortValue
-        ? [...lhbAgg.rows].sort((a, b) => {
-            const va = lhbSortCol.sortValue(a), vb = lhbSortCol.sortValue(b);
-            if (va == null && vb == null) return 0;
-            if (va == null) return 1;
-            if (vb == null) return -1;
-            return lhbSort.dir === 'asc' ? va - vb : vb - va;
-          })
-        : lhbAgg.rows;
 
       const tagFor = (key) => h('span', { className: `htx-tag ${catClass(key)}` }, catLabel(key));
 
@@ -1633,7 +1711,7 @@ window.__ModuleLoader__.load({
               ariaLabel: '资讯类型',
               value: type,
               onChange: (t) => search(t, t === 'announcement' ? symbol.trim() : ''),
-              options: [{ value: 'news', label: '快讯' }, { value: 'lhb', label: '龙虎榜' }, { value: 'announcement', label: '公告' }, { value: 'weibo', label: '微博' }],
+              options: [{ value: 'news', label: '快讯' }, { value: 'announcement', label: '公告' }, { value: 'weibo', label: '微博' }],
             })),
           h('label', { className: 'htx-watchToggle', title: '只显示与自选股相关的条目（龙虎榜/公告按代码匹配，快讯按标题/摘要中的股票名称匹配）' },
             h('input', {
@@ -1662,45 +1740,6 @@ window.__ModuleLoader__.load({
           : type !== 'weibo' && !items.length ? h(Empty, { text: '暂无内容', hint: '换个类型或稍后再试' })
           : type !== 'weibo' && onlyWatch && !filtered.length ? h(Empty, { text: '自选股相关的资讯暂无', hint: '关闭「只看自选」查看全部，或在自选股中加入更多个股' })
           : h('div', null,
-
-            // ===== 龙虎榜：资金摘要 + 分歧图 + 聚合表 =====
-            type === 'lhb' ? h('div', null,
-              h('div', { className: 'htx-sumCard' },
-                h('b', null, `${lhbAgg.rows.length} 家上榜`),
-                `（${lhbAgg.dates.length > 1 ? lhbAgg.dates.join('、') : lhbAgg.dates[0] || ''}）：机构/营业部合计`,
-                h('b', { className: 'htx-up' }, ` 净买 ${yi(sumBuy)} 亿`),
-                '、',
-                h('b', { className: 'htx-down' }, `净卖 ${yi(sumSellAbs)} 亿`),
-                '。资金分歧最大的是 ',
-                topBuy ? h('b', null, `${topBuy.name}（净买 ${yi(topBuy.netBuyAmt)} 亿，${pct(topBuy.changeRate)}）`) : null,
-                topBuy && topSell ? '；' : null,
-                topSell ? h('b', null, `${topSell.name}（净卖 ${yi(Math.abs(topSell.netBuyAmt))} 亿，${pct(topSell.changeRate)}）`) : null,
-                '。'),
-              h('div', { className: 'htx-metrics' },
-                h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '上榜家数'), h('p', { className: 'htx-metricValue' }, String(lhbAgg.rows.length))),
-                h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净买合计(亿)'), h('p', { className: 'htx-metricValue htx-up' }, yi(sumBuy))),
-                h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净卖合计(亿)'), h('p', { className: 'htx-metricValue htx-down' }, yi(sumSellAbs))),
-                topBuy ? h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净买王'), h('p', { className: 'htx-metricValue' }, topBuy.name)) : null,
-                topSell ? h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净卖王'), h('p', { className: 'htx-metricValue' }, topSell.name)) : null),
-              chartRows.length ? h('div', { className: 'htx-card' },
-                h('h3', { className: 'htx-cardTitle' }, '多空分歧榜（净买 ←→ 净卖，点行加入自选）'),
-                h('div', { className: 'htx-lhbChart' },
-                  chartRows.map((r) => {
-                    const w = `${(Math.abs(r.netBuyAmt) / maxAbs * 50).toFixed(1)}%`;
-                    const buy = r.netBuyAmt > 0;
-                    return h('div', {
-                      key: `${r.code}-${r.reason}`, className: 'htx-lhbRow',
-                      title: adding === String(r.code) ? '加入中…' : '点击加入自选',
-                      style: adding === String(r.code) ? { opacity: 0.55, cursor: 'wait' } : undefined,
-                      onClick: () => quickAdd(r.code),
-                    },
-                      h('span', { className: 'htx-lhbName' }, r.name),
-                      h('div', { className: 'htx-lhbTrack' },
-                        h('div', { className: `htx-lhbBar ${buy ? 'buy' : 'sell'}`, style: buy ? { width: w } : { width: w } })),
-                      h('span', { className: `htx-lhbAmt ${buy ? 'htx-up' : 'htx-down'}` }, `${buy ? '+' : ''}${yi(r.netBuyAmt)} 亿`));
-                  }))) : null,
-              lhbRows.length ? h('div', { className: 'htx-card', style: { paddingTop: 10 } },
-                h(DataTable, { columns, rows: lhbRows, getKey: (r) => `${r.code}-${r.reason}`, sort: lhbSort, onSortChange: onLhbSort })) : null) : null,
 
             // ===== 快讯：摘要 + 分类筛选 + 时间轴 =====
             type === 'news' ? h('div', null,
@@ -2511,6 +2550,7 @@ curl -X POST http://127.0.0.1:8099/api \\
       const tabs = [
         ['行情自选', '加自选、看实时行情表；点个股代码看 K线图 + 指标详情'],
         ['量能', '沪深京三市日成交额趋势（柱 + MA5）：区间 20/40/60 日、量能状态、指数涨跌与明细表'],
+        ['龙虎榜', '每日龙虎榜：资金摘要、多空分歧榜、上榜原因与净买额排序'],
         ['强势股', '按交易日看当日涨幅 > 7% 的股票：左侧日期导航切换，含涨停连板、首封时间、行业与最新涨跌'],
         ['选股', '按涨跌幅/成交额/换手/市值排序，叠加市盈率、市值、涨幅、换手区间过滤'],
         ['持仓', '记录持股与成本，实时算市值、盈亏、盈亏率'],
@@ -2565,6 +2605,7 @@ node server.js          # 默认 http://127.0.0.1:8099
       { id: 'portfolio', label: '持仓', group: 'work', render: () => h(PortfolioView) },
       { id: 'backtest', label: '回测', group: 'work', render: () => h(BacktestView) },
       { id: 'news', label: '资讯', group: 'work', render: () => h(NewsView) },
+      { id: 'lhb', label: '龙虎榜', group: 'work', render: () => h(LhbView) },
       { id: 'alerts', label: '预警', group: 'work', render: () => h(AlertsView) },
       { id: 'skills', label: 'Agent 技能', group: 'ref', render: () => h(SkillsView) },
       { id: 'api', label: 'API', group: 'ref', render: () => h(ApiView) },
