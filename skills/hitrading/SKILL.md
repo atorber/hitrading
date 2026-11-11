@@ -144,11 +144,14 @@ curl -s "http://127.0.0.1:8099/api?op=weibo&pageSize=10"
 curl -s "http://127.0.0.1:8099/api?op=weibo&keyword=DRAM&days=3"
 ```
 
-`extract` 用模型解析未提取的微博，把提到的 A股标的写入自选（已存在只更新最后提及时间），并对微博打「已提取」标记、不重复处理。**仅 Harness 内可用**（需要模型通道，独立 8099 服务不支持）：
+`extract` 启动**后台提取任务**：用模型解析未提取的微博，把提到的 A股标的写入自选（已存在只更新最后提及时间），并对微博打「已提取」标记、不重复处理。任务在 Host 侧运行，刷新页面/切 Tab 不会中断；用 `action=task` 查进度，`action=cancel` 停止。**仅 Harness 内可用**（需要模型通道，独立 8099 服务不支持）：
 
 ```bash
 # 在 Harness 对话里说：把微博里提到的股票提取出来
 ```
+
+任务返回结构：`{ id, status(running/done/error/cancelled/interrupted), processed, batches, withStocks, remaining, added[], updated[], error }`；
+同一时刻只有一个任务在跑，重复调用返回当前任务状态（`alreadyRunning: true`）。
 
 返回 `value.items[]`：`id screenName text createdAt attitudes comments reposts extracted{at,stocks[]}`；
 `extract` 返回 `processed pendingLeft withStocks added[] updated[] message`。

@@ -279,6 +279,7 @@ window.__ModuleLoader__.load({
 .htx-lhbBar.buy{left:50%;background:linear-gradient(90deg,color-mix(in srgb,var(--dsw-alias-state-error-primary) 55%,transparent),var(--dsw-alias-state-error-primary))}
 .htx-lhbBar.sell{right:50%;background:linear-gradient(270deg,color-mix(in srgb,var(--dsw-alias-state-success-primary) 55%,transparent),var(--dsw-alias-state-success-primary))}
 .htx-lhbAmt{font-size:11.5px;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.htx-btnWarn{border-color:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 55%,transparent);color:var(--dsw-alias-state-warn-primary)}
 .htx-tagExtracted{color:var(--dsw-alias-state-business-primary);background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 12%,transparent)}
 .htx-reasonChips{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
 .htx-reasonChip{font-size:10.5px;line-height:1.5;color:var(--dsw-alias-label-tertiary);background:var(--dsw-specific-sidebar-fill);border:1px solid var(--dsw-alias-border-l3);border-radius:5px;padding:1px 6px}
@@ -1861,8 +1862,11 @@ window.__ModuleLoader__.load({
     function WeiboView() {
       const [onlyWatch, setOnlyWatch] = useState(false);
       const [wUser, setWUser] = useState(null);
-      const [extracting, setExtracting] = useState(false);
       const wb = useData(() => api('weibo', { pageSize: 50, ...(wUser ? { userId: wUser } : {}) }), [wUser], { refreshMs: 120_000 });
+      // 提取任务：Host 侧后台运行，这里只轮询进度（离开页面也不会中断）
+      const task = useData(() => api('weibo.task'), [], { refreshMs: 3_000 });
+      const running = task.value?.status === 'running';
+      const taskSeen = useRef(null);
       const { watch, rows: watchRows, matchWatch } = useWatchMatch();
       const raw = wb.value?.items || [];
       const bloggers = wb.value?.bloggers || [];
@@ -1872,22 +1876,33 @@ window.__ModuleLoader__.load({
       const pending = raw.filter((w) => !w.extracted).length;
 
       const extractStocks = async () => {
-        if (extracting) return;
-        setExtracting(true);
+        if (running) { void api('weibo.cancel').then(() => task.reload()).catch(() => {}); return; }
         try {
           const r = await api('weibo.extract', { batch: 20 });
-          if (!r.processed) notifyWarn(r.message || '没有新的微博需要提取');
-          else {
-            const parts = [`已处理 ${r.processed} 条微博`];
-            if (r.added?.length) parts.push(`新增自选 ${r.added.length} 只`);
-            if (r.updated?.length) parts.push(`更新提及 ${r.updated.length} 只`);
-            if (!r.withStocks) parts.push('未识别到个股');
+          notifyOk(r.message || '提取任务已启动');
+          task.reload();
+        } catch (e) { notifyError(`启动提取失败：${e.message}`); }
+      };
+
+      // 任务结束：提示汇总并刷新列表（含切走再回来的情况）
+      useEffect(() => {
+        const t = task.value;
+        if (!t || !t.id || t.status === 'running') return;
+        if (taskSeen.current === `${t.id}:${t.status}`) return;
+        taskSeen.current = `${t.id}:${t.status}`;
+        if (t.status === 'done' || t.status === 'cancelled') {
+          if (t.processed) {
+            const parts = [`提取完成：处理 ${t.processed} 条微博`];
+            if (t.added?.length) parts.push(`新增自选 ${t.added.length} 只`);
+            if (t.updated?.length) parts.push(`更新提及 ${t.updated.length} 只`);
+            if (!t.withStocks) parts.push('未识别到个股');
             notifyOk(parts.join('，'));
           }
-          wb.reload();
-        } catch (e) { notifyError(`提取失败：${e.message}`); }
-        finally { setExtracting(false); }
-      };
+        } else if (t.status === 'error' || t.status === 'interrupted') {
+          notifyError(`提取任务中断：${t.error || '未知原因'}`);
+        }
+        wb.reload();
+      }, [task.value]);
 
       return h('div', null,
         h('div', { className: 'htx-toolbar' },
@@ -1896,14 +1911,19 @@ window.__ModuleLoader__.load({
             '只看自选'),
           h('span', { className: 'htx-meta' },
             `微博 ${onlyWatch ? `${filtered.length}/${raw.length}` : raw.length}/${totalN} 条 · 未提取 ${pending}`,
+            running ? ` · 后台提取中 ${task.value.processed || 0} 条` : '',
             onlyWatch && watch.loading ? ' · 自选加载中' : '',
             wb.updatedAt ? ` · ${new Date(wb.updatedAt).toLocaleTimeString('zh-CN', { hour12: false })}` : '',
             wb.error ? h('span', { className: 'htx-metaWarn', title: `刷新失败：${wb.error}` }, ' · 刷新失败') : null),
           h('button', {
-            className: 'htx-btn htx-btnSm htx-btnPrimary', disabled: extracting,
-            title: '把未提取的微博交给模型解析 A股标的并写入自选（已提取的不重复处理）',
+            className: `htx-btn htx-btnSm ${running ? 'htx-btnWarn' : 'htx-btnPrimary'}`,
+            title: running
+              ? '任务在后台运行（离开页面不中断），点击停止'
+              : '把未提取的微博交给模型解析 A股标的并写入自选；后台运行，离开页面不中断',
             onClick: extractStocks,
-          }, extracting ? '提取中…' : `提取股票${pending ? ` (${pending})` : ''}`),
+          }, running
+            ? `提取中 ${task.value?.processed || 0}${task.value?.remaining != null ? `/${(task.value.processed || 0) + (task.value.remaining || 0)}` : ''} · 点此停止`
+            : `提取股票${pending ? ` (${pending})` : ''}`),
           h(RefreshBtn, { busy: wb.refreshing, onClick: () => wb.reload() })),
 
         wb.error ? h(ErrorBox, { error: `微博服务不可用：${wb.error}` }) : wb.loading && !raw.length ? h(Spinner)

@@ -132,6 +132,16 @@ function renderPowerful(v) {
 
 function renderWeibo(v) {
   if (v.error) return `HiTrading 微博查询失败：${v.error}`;
+  // 任务状态形态
+  if (v.status) {
+    const lines = [`微博提取任务：${v.status}${v.cancelRequested ? '（正在停止）' : ''}`];
+    if (v.processed != null) lines.push(`已处理 ${v.processed} 条微博，含个股 ${v.withStocks ?? 0} 条；剩余待提取 ${v.remaining ?? '-'} 条。`);
+    if (v.added?.length) lines.push(`新增自选：${v.added.map((x) => `${x.name}(${x.code})`).join('、')}`);
+    if (v.updated?.length) lines.push(`更新提及：${v.updated.map((x) => `${x.name}(${x.code})`).join('、')}`);
+    if (v.message) lines.push(v.message);
+    if (v.error) lines.push(`错误：${v.error}`);
+    return lines.join('\n');
+  }
   // 提取结果形态
   if (v.processed !== undefined) {
     const lines = [`微博股票提取：${v.message || ''}`];
@@ -230,7 +240,7 @@ function renderBacktest(v) {
 // ---------- apply ----------
 export function apply(ctx) {
   const store = openStore();
-  ctx.effect(() => () => store.close());
+  ctx.effect(() => () => { weiboDisposed = true; store.close(); });
   const tables = {
     watchlist: store.table('watchlist'),
     positions: store.table('positions'),
@@ -268,6 +278,7 @@ export function apply(ctx) {
       else if (chunk.type === 'finish') finish = chunk.reason;
     }
     if (finish?.kind === 'error') throw new Error(`模型调用失败：${finish.failure?.message || finish.failure?.code || '未知错误'}`);
+    if (finish?.kind === 'max-tokens') throw new Error('模型输出超过上限被截断，请减小 batch 后重试');
     if (finish?.kind === 'aborted') throw new Error('模型调用被取消');
     if (!text.trim()) throw new Error('模型没有返回内容');
     return text;
@@ -285,26 +296,113 @@ export function apply(ctx) {
     '{"items":[{"id":"微博id","stocks":[{"code":"600519","name":"贵州茅台"}]}]}',
   ].join('\n');
 
+  // ----- 微博提取：后台任务 -----
+  const WEIBO_TASK_KEY = 'task:current';
+  let weiboTask = null;
+  let weiboDisposed = false;
+
+  const saveWeiboTask = (t) => {
+    weiboTask = t;
+    try { tables.weibo.put(WEIBO_TASK_KEY, t); } catch { /* 持久化失败不影响运行 */ }
+    return t;
+  };
+  const loadWeiboTask = () => {
+    try { return tables.weibo.get(WEIBO_TASK_KEY) || null; } catch { return null; }
+  };
+  const mergeStocks = (base, extra) => {
+    const m = new Map((base || []).map((x) => [x.code, x]));
+    for (const x of extra || []) if (!m.has(x.code)) m.set(x.code, x);
+    return [...m.values()];
+  };
+
+  // 上次任务因宿主重启中断：标记为 interrupted，避免永远显示「进行中」
+  {
+    const stale = loadWeiboTask();
+    if (stale?.status === 'running') {
+      saveWeiboTask({ ...stale, status: 'interrupted', error: '宿主重启导致任务中断', finishedAt: new Date().toISOString() });
+    }
+  }
+
+  const runWeiboTask = async ({ batch = 20, maxBatches = 20 } = {}) => {
+    const id = `w${Date.now()}`;
+    saveWeiboTask({
+      id, status: 'running', batch, maxBatches,
+      processed: 0, batches: 0, withStocks: 0,
+      added: [], updated: [], remaining: null,
+      startedAt: new Date().toISOString(), finishedAt: null, error: null,
+    });
+    try {
+      for (let i = 0; i < maxBatches; i++) {
+        if (weiboDisposed) throw new Error('插件已卸载，任务终止');
+        if (weiboTask.cancelRequested) { weiboTask.status = 'cancelled'; break; }
+        const runBatch = async (size) => extractStocksFromWeibos({
+          batch: size,
+          tables,
+          analyze: async ({ items, pending }) => {
+            const payload = items.map((w) => `[${w.id}] @${w.screenName}：${w.text}`).join('\n');
+            return llmText({
+              system: EXTRACT_SYSTEM,
+              user: `共 ${items.length} 条微博需要抽取（还有 ${pending} 条待处理）：\n${payload}`,
+              // 每条微博可能抽出多只股票：按 260 token/条 预留，上限 8000
+              maxTokens: Math.min(8000, 800 + items.length * 260),
+            });
+          },
+        });
+        // 单批失败（如模型输出异常）：减半重试一次，仍失败则记录后继续后面的批次
+        let r;
+        let lastErr = null;
+        for (const size of [batch, Math.max(3, Math.ceil(batch / 2))]) {
+          try { r = await runBatch(size); lastErr = null; break; }
+          catch (e) { lastErr = e; }
+        }
+        if (!r) {
+          weiboTask.failedBatches = (weiboTask.failedBatches || 0) + 1;
+          weiboTask.lastError = errMsg(lastErr);
+          saveWeiboTask(weiboTask);
+          if (weiboTask.failedBatches >= 3) throw new Error(`连续 ${weiboTask.failedBatches} 批失败：${weiboTask.lastError}`);
+          continue;
+        }
+        if (!r.processed) { weiboTask.note = r.message || '没有新的微博需要提取'; break; }
+        weiboTask.processed += r.processed;
+        weiboTask.batches += 1;
+        weiboTask.withStocks += r.withStocks || 0;
+        weiboTask.added = mergeStocks(weiboTask.added, r.added);
+        weiboTask.updated = mergeStocks(weiboTask.updated, r.updated);
+        weiboTask.remaining = r.pendingLeft ?? null;
+        saveWeiboTask(weiboTask);
+        if (!r.pendingLeft) break;
+      }
+      if (weiboTask.status === 'running') weiboTask.status = 'done';
+    } catch (e) {
+      weiboTask.status = 'error';
+      weiboTask.error = errMsg(e);
+    } finally {
+      weiboTask.finishedAt = new Date().toISOString();
+      delete weiboTask.cancelRequested;
+      saveWeiboTask(weiboTask);
+      ctx.logger.info(`[HiTrading] 微博提取任务结束：${weiboTask.status}，共处理 ${weiboTask.processed} 条`);
+    }
+  };
+
   const weiboOps = {
+    // 提取任务状态（Host 侧持有：脱离 HTTP 请求生命周期，离开页面/切 Tab 不中断）
     'weibo.extract': async (args = {}) => {
-      const batch = Math.min(50, Math.max(1, Number(args.batch) || 20));
-      let raw = null;
-      const value = await extractStocksFromWeibos({
-        batch,
-        tables,
-        analyze: async ({ items, pending }) => {
-          const payload = items.map((w) => `[${w.id}] @${w.screenName}：${w.text}`).join('\n');
-          const out = await llmText({
-            system: EXTRACT_SYSTEM,
-            user: `共 ${items.length} 条微博需要抽取（还有 ${pending} 条待处理）：\n${payload}`,
-            maxTokens: Math.min(3000, 400 + items.length * 220),
-          });
-          raw = out;
-          return out;
-        },
+      if (weiboTask?.status === 'running') {
+        return { ...weiboTask, alreadyRunning: true, message: '提取任务已在后台运行' };
+      }
+      void runWeiboTask({
+        batch: Math.min(50, Math.max(1, Number(args.batch) || 20)),
+        maxBatches: Math.min(50, Math.max(1, Number(args.maxBatches) || 20)),
       });
-      if (args.debug) value.raw = String(raw || '').slice(0, 1500);
-      return value;
+      // runWeiboTask 在首个 await 前已同步置为 running
+      return { ...weiboTask, message: '提取任务已启动（后台运行，离开页面不会中断）' };
+    },
+    'weibo.task': async () => weiboTask || loadWeiboTask() || { status: 'idle' },
+    'weibo.cancel': async () => {
+      if (weiboTask?.status !== 'running') return { ...(weiboTask || { status: 'idle' }), message: '当前没有运行中的任务' };
+      weiboTask.cancelRequested = true;
+      saveWeiboTask(weiboTask);
+      return { ...weiboTask, message: '已请求停止，当前批次结束后退出' };
     },
     'weibo.stats': async (args = {}) => weiboExtractStats({ tables, sample: Number(args.sample) || 50 }),
   };
@@ -462,7 +560,7 @@ export function apply(ctx) {
     name: 'hitrading_weibo',
     description: '微博监控：action=list 查询已入库微博（按时间倒序，支持博主/关键词/近 N 天过滤，带点赞/评论/转发数）；action=extract 用模型解析未提取微博里的 A股标的并写入自选（已存在则只更新最后提及时间，已提取过的微博不重复处理）。需本地已运行 Weibo Crawler 服务（默认 127.0.0.1:15001）。',
     parameters: {
-      action: { type: 'string', enum: ['list', 'extract'], description: 'list 查看（默认）/ extract 提取股票' },
+      action: { type: 'string', enum: ['list', 'extract', 'task', 'cancel'], description: 'list 查看（默认）/ extract 启动提取任务 / task 查询任务进度 / cancel 停止任务' },
       page: { type: 'integer', description: '页码，默认 1' },
       pageSize: { type: 'integer', description: '每页条数 1~50，默认 30' },
       userId: { type: 'string', description: '按博主 user_id 过滤（可选）' },
@@ -472,9 +570,12 @@ export function apply(ctx) {
       debug: { type: 'boolean', description: 'extract 时返回模型原始输出，用于排查解析问题' },
     },
     output: { schema: { type: 'json' }, render: (_a, v) => [{ type: 'text', text: renderWeibo(v) }] },
-    execute: (args) => (args.action === 'extract'
-      ? weiboOps['weibo.extract'](args)
-      : getWeibos(args, tables)),
+    execute: (args) => {
+      if (args.action === 'extract' || args.action === 'task' || args.action === 'cancel') {
+        return weiboOps[`weibo.${args.action}`](args);
+      }
+      return getWeibos(args, tables);
+    },
     presentCall: (a) => ({ card: 'generic', title: '微博监控', rawInput: a }),
   }));
 
