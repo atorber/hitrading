@@ -134,6 +134,25 @@ curl -s "http://127.0.0.1:8099/api?op=powerful&date=2026-11-06"
 `value.stats`：`count ztCount maxLbc avgPct`。
 历史日期首次查询会扫描全市场日K（约 20 秒）并按日缓存进 SQLite，之后秒出。
 
+### weibo — 微博监控与股票提取
+
+参数：`action`（`list` 查看 / `extract` 提取股票）、`page`、`pageSize`（1~50）、`userId`、`keyword`、`days`、`batch`（extract 条数，1~50，默认 20）
+
+```bash
+# 列表（需本地 Weibo Crawler 服务，默认 127.0.0.1:15001）
+curl -s "http://127.0.0.1:8099/api?op=weibo&pageSize=10"
+curl -s "http://127.0.0.1:8099/api?op=weibo&keyword=DRAM&days=3"
+```
+
+`extract` 用模型解析未提取的微博，把提到的 A股标的写入自选（已存在只更新最后提及时间），并对微博打「已提取」标记、不重复处理。**仅 Harness 内可用**（需要模型通道，独立 8099 服务不支持）：
+
+```bash
+# 在 Harness 对话里说：把微博里提到的股票提取出来
+```
+
+返回 `value.items[]`：`id screenName text createdAt attitudes comments reposts extracted{at,stocks[]}`；
+`extract` 返回 `processed pendingLeft withStocks added[] updated[] message`。
+
 ### news — 资讯 / 公告 / 龙虎榜
 
 参数：`type`（`news`/`announcement`/`lhb`，必填）、`symbol`（公告可按代码过滤）、`count`（1~50，默认 20）

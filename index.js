@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { normalizeSymbols } from './lib/symbol.js';
 import { getQuotes } from './lib/quotes.js';
 import { openStore } from './lib/db.js';
-import { getWeibos } from './lib/weibo.js';
+import { getWeibos, extractStocksFromWeibos, weiboExtractStats } from './lib/weibo.js';
 import { runOp, strategies, TIERS, DOMAINS, PCT_N } from './lib/ops.js';
 
 const SKILL_PATH = new URL('./skills/hitrading/SKILL.md', import.meta.url);
@@ -13,7 +13,7 @@ const SKILL_PATH = new URL('./skills/hitrading/SKILL.md', import.meta.url);
 const SERVER_PATH = fileURLToPath(new URL('./server.js', import.meta.url));
 
 /** Host 服务依赖。 */
-export const inject = ['tools', 'systemPrompt', 'timer', 'connection'];
+export const inject = ['tools', 'systemPrompt', 'timer', 'connection', 'llm'];
 
 const DISCLAIMER =
   'HiTrading 提供的 A股行情、指标、选股与分析结果仅供研究参考，不构成任何投资建议。' +
@@ -132,6 +132,15 @@ function renderPowerful(v) {
 
 function renderWeibo(v) {
   if (v.error) return `HiTrading 微博查询失败：${v.error}`;
+  // 提取结果形态
+  if (v.processed !== undefined) {
+    const lines = [`微博股票提取：${v.message || ''}`];
+    if (v.raw) lines.push(`模型原始输出：\n${v.raw}`);
+    if (v.added?.length) lines.push(`新增自选：${v.added.map((x) => `${x.name}(${x.code})`).join('、')}`);
+    if (v.updated?.length) lines.push(`更新提及：${v.updated.map((x) => `${x.name}(${x.code})`).join('、')}`);
+    if (v.withStocks != null) lines.push(`含个股的微博 ${v.withStocks} 条；剩余待提取 ${v.pendingLeft ?? 0} 条。`);
+    return lines.join('\n');
+  }
   const items = v.items || [];
   if (!items.length) return '未查询到微博。';
   const lines = items.map((w, i) => {
@@ -227,6 +236,77 @@ export function apply(ctx) {
     positions: store.table('positions'),
     alerts: store.table('alerts'),
     powerful: store.table('powerful'),   // 强势股按日缓存
+    weibo: store.table('weibo'),         // 微博股票提取标记
+  };
+
+  // 微博「提取股票」：用会话默认模型解析微博正文里的 A股标的
+  const pickModel = () => {
+    const def = ctx.get('agentDefaultModel');
+    const sel = def && typeof def.currentSelection === 'function' ? def.currentSelection() : null;
+    if (sel?.provider && sel?.model) return { provider: sel.provider, model: sel.model };
+    const provider = (ctx.llm.listProviders() || [])[0];
+    if (!provider) throw new Error('没有可用的模型 Provider');
+    const model = (ctx.llm.listModels(provider.id) || [])[0];
+    if (!model) throw new Error(`Provider ${provider.id} 没有可用模型`);
+    return { provider: provider.id, model: model.id };
+  };
+
+  const llmText = async ({ system, user, maxTokens = 1500 }) => {
+    const route = pickModel();
+    let text = '';
+    let finish = null;
+    const stream = ctx.llm.stream({
+      provider: route.provider,
+      model: route.model,
+      maxTokens,
+      system,
+      messages: [{ role: 'user', content: [{ type: 'text', text: user }] }],
+      purpose: 'hitrading-weibo-extract',
+    });
+    for await (const chunk of stream) {
+      if (chunk.type === 'text-delta') text += chunk.text;
+      else if (chunk.type === 'finish') finish = chunk.reason;
+    }
+    if (finish?.kind === 'error') throw new Error(`模型调用失败：${finish.failure?.message || finish.failure?.code || '未知错误'}`);
+    if (finish?.kind === 'aborted') throw new Error('模型调用被取消');
+    if (!text.trim()) throw new Error('模型没有返回内容');
+    return text;
+  };
+
+  const EXTRACT_SYSTEM = [
+    '你是 A股标的抽取器。输入是若干条微博，每条带 id。',
+    '任务：找出每条微博明确提到的 A股上市公司（沪深京主板/创业板/科创板/北交所股票、A股上市 ETF）。',
+    '规则：',
+    '1. 只提取明确指代上市公司或 A股 ETF 的名称/代码；板块、行业、概念、指数、海外公司、港股、美股都不要。',
+    '2. 名称要写公司常用简称（如“君正股份”），有 6 位代码就填 code，不确定就省略 code。',
+    '3. 同一条微博里重复出现的同一家公司只保留一次。',
+    '4. 没有任何股票时给空数组。',
+    '只输出 JSON，不要解释、不要 Markdown。格式：',
+    '{"items":[{"id":"微博id","stocks":[{"code":"600519","name":"贵州茅台"}]}]}',
+  ].join('\n');
+
+  const weiboOps = {
+    'weibo.extract': async (args = {}) => {
+      const batch = Math.min(50, Math.max(1, Number(args.batch) || 20));
+      let raw = null;
+      const value = await extractStocksFromWeibos({
+        batch,
+        tables,
+        analyze: async ({ items, pending }) => {
+          const payload = items.map((w) => `[${w.id}] @${w.screenName}：${w.text}`).join('\n');
+          const out = await llmText({
+            system: EXTRACT_SYSTEM,
+            user: `共 ${items.length} 条微博需要抽取（还有 ${pending} 条待处理）：\n${payload}`,
+            maxTokens: Math.min(3000, 400 + items.length * 220),
+          });
+          raw = out;
+          return out;
+        },
+      });
+      if (args.debug) value.raw = String(raw || '').slice(0, 1500);
+      return value;
+    },
+    'weibo.stats': async (args = {}) => weiboExtractStats({ tables, sample: Number(args.sample) || 50 }),
   };
 
   ctx.systemPrompt.section({ name: 'hitrading:disclaimer', order: 9000, text: DISCLAIMER });
@@ -268,6 +348,10 @@ export function apply(ctx) {
         // 服务状态与启停（面板头部按钮）
         if (op && Object.prototype.hasOwnProperty.call(serviceOps, op)) {
           return Response.json({ ok: true, value: await serviceOps[op]() });
+        }
+        // 微博提取需要 Host 的模型通道（独立 8099 服务不支持）
+        if (op && Object.prototype.hasOwnProperty.call(weiboOps, op)) {
+          return Response.json({ ok: true, value: await weiboOps[op](args) });
         }
         const value = await runOp(op, args, tables);
         return Response.json({ ok: true, value });
@@ -376,16 +460,21 @@ export function apply(ctx) {
   // 8) 微博监控
   ctx.tools.register(defineTool({
     name: 'hitrading_weibo',
-    description: '查询本地微博监控数据（Weibo Crawler 已入库的微博，按时间倒序）：支持按博主、关键词、近 N 天过滤，带点赞/评论/转发数。需本地已运行 Weibo Crawler 服务（默认 127.0.0.1:15001）。',
+    description: '微博监控：action=list 查询已入库微博（按时间倒序，支持博主/关键词/近 N 天过滤，带点赞/评论/转发数）；action=extract 用模型解析未提取微博里的 A股标的并写入自选（已存在则只更新最后提及时间，已提取过的微博不重复处理）。需本地已运行 Weibo Crawler 服务（默认 127.0.0.1:15001）。',
     parameters: {
+      action: { type: 'string', enum: ['list', 'extract'], description: 'list 查看（默认）/ extract 提取股票' },
       page: { type: 'integer', description: '页码，默认 1' },
       pageSize: { type: 'integer', description: '每页条数 1~50，默认 30' },
       userId: { type: 'string', description: '按博主 user_id 过滤（可选）' },
       keyword: { type: 'string', description: '关键词过滤（可选）' },
       days: { type: 'integer', description: '只看最近 N 天（可选）' },
+      batch: { type: 'integer', description: 'extract 时本次处理条数 1~50，默认 20' },
+      debug: { type: 'boolean', description: 'extract 时返回模型原始输出，用于排查解析问题' },
     },
     output: { schema: { type: 'json' }, render: (_a, v) => [{ type: 'text', text: renderWeibo(v) }] },
-    execute: (args) => getWeibos(args),
+    execute: (args) => (args.action === 'extract'
+      ? weiboOps['weibo.extract'](args)
+      : getWeibos(args, tables)),
     presentCall: (a) => ({ card: 'generic', title: '微博监控', rawInput: a }),
   }));
 

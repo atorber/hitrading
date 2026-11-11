@@ -279,6 +279,7 @@ window.__ModuleLoader__.load({
 .htx-lhbBar.buy{left:50%;background:linear-gradient(90deg,color-mix(in srgb,var(--dsw-alias-state-error-primary) 55%,transparent),var(--dsw-alias-state-error-primary))}
 .htx-lhbBar.sell{right:50%;background:linear-gradient(270deg,color-mix(in srgb,var(--dsw-alias-state-success-primary) 55%,transparent),var(--dsw-alias-state-success-primary))}
 .htx-lhbAmt{font-size:11.5px;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.htx-tagExtracted{color:var(--dsw-alias-state-business-primary);background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 12%,transparent)}
 .htx-reasonChips{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
 .htx-reasonChip{font-size:10.5px;line-height:1.5;color:var(--dsw-alias-label-tertiary);background:var(--dsw-specific-sidebar-fill);border:1px solid var(--dsw-alias-border-l3);border-radius:5px;padding:1px 6px}
 .htx-list{list-style:none;margin:0;padding:0}
@@ -1682,6 +1683,7 @@ window.__ModuleLoader__.load({
       const [cat, setCat] = useState(null);            // 选中的分类 key（null = 全部）
       const [onlyWatch, setOnlyWatch] = useState(false); // 只看自选相关
       const [wUser, setWUser] = useState(null);          // 微博：选中的博主
+      const [extracting, setExtracting] = useState(false); // 微博：提取股票进行中
       const data = useData(() => api('news', run), [run]);
       const wb = useData(() => (type === 'weibo' ? api('weibo', { pageSize: 50, ...(wUser ? { userId: wUser } : {}) }) : Promise.resolve(null)), [type, wUser], { refreshMs: 120_000 });
       const watchListWb = useData(() => api('watchlist.list'), [], { refreshMs: 60000 });
@@ -1735,8 +1737,27 @@ window.__ModuleLoader__.load({
       const wbTotalN = (wb.value && wb.value.total) || 0;
       const wbWatchNames = new Set((watchListWb.value?.items || []).map((w) => w.name).filter(Boolean));
       const wbFiltered = onlyWatch ? wbRaw.filter((w) => matchWatch(w)) : wbRaw;
+      const wbPending = wbRaw.filter((w) => !w.extracted).length;
 
       const [adding, setAdding] = useState(null);   // 正在加入的 code（防重复点击）
+      const extractStocks = async () => {
+        if (extracting) return;
+        setExtracting(true);
+        try {
+          const r = await api('weibo.extract', { batch: 20 });
+          if (!r.processed) notifyWarn(r.message || '没有新的微博需要提取');
+          else {
+            const parts = [`已处理 ${r.processed} 条微博`];
+            if (r.added?.length) parts.push(`新增自选 ${r.added.length} 只`);
+            if (r.updated?.length) parts.push(`更新提及 ${r.updated.length} 只`);
+            if (!r.withStocks) parts.push('未识别到个股');
+            notifyOk(parts.join('，'));
+          }
+          wb.reload();
+        } catch (e) { notifyError(`提取失败：${e.message}`); }
+        finally { setExtracting(false); }
+      };
+
       const quickAdd = async (code) => {
         const c = String(code ?? '').trim();
         if (!/^\d{6}$/.test(c)) { notifyError(`无效代码：${code}`); return; }
@@ -1799,11 +1820,16 @@ window.__ModuleLoader__.load({
               h('button', { className: 'htx-btn htx-btnSm', onClick: () => search('announcement', symbol.trim()) }, '查询'))) : null,
           h('span', { className: 'htx-meta' },
             ...(type === 'weibo'
-              ? [`微博监控 ${onlyWatch ? `${wbFiltered.length}/${wbRaw.length}` : wbRaw.length}/${wbTotalN} 条`]
+              ? [`微博监控 ${onlyWatch ? `${wbFiltered.length}/${wbRaw.length}` : wbRaw.length}/${wbTotalN} 条 · 未提取 ${wbPending}`]
               : [`${data.value?.title || ''} ${onlyWatch ? `${filtered.length}/${items.length}` : items.length} 条`]),
             onlyWatch && watch.loading ? ' · 自选加载中' : '',
             data.updatedAt ? ` · ${new Date(data.updatedAt).toLocaleTimeString('zh-CN', { hour12: false })}` : '',
             data.error ? h('span', { className: 'htx-metaWarn', title: `刷新失败：${data.error}` }, ' · 刷新失败') : null),
+          type === 'weibo' ? h('button', {
+            className: 'htx-btn htx-btnSm htx-btnPrimary', disabled: extracting,
+            title: '把未提取的微博交给模型解析 A股标的并写入自选（已提取的不重复处理）',
+            onClick: extractStocks,
+          }, extracting ? '提取中…' : `提取股票${wbPending ? ` (${wbPending})` : ''}`) : null,
           h(RefreshBtn, { busy: type === 'weibo' ? wb.refreshing : data.refreshing, onClick: () => (type === 'weibo' ? wb.reload() : data.reload()) })),
 
         type === 'weibo' && wb.error ? h(ErrorBox, { error: `微博服务不可用：${wb.error}` })
@@ -1857,8 +1883,14 @@ window.__ModuleLoader__.load({
                   h('div', { className: 'htx-tlTitle' },
                     `@${w.screenName}`,
                     h('span', { className: 'htx-reasonChip', title: '点赞/评论/转发' }, `赞${w.attitudes} 评${w.comments} 转${w.reposts}`),
-                    wbWatchNames.has(w.screenName) ? h('span', { className: 'htx-tag htx-tagReg' }, '已监控') : null),
-                  h('div', { className: 'htx-tlSum', style: { WebkitLineClamp: 4 } }, (w.text || '').replace(/\s+/g, ' ').trim()))))) : null,
+                    wbWatchNames.has(w.screenName) ? h('span', { className: 'htx-tag htx-tagReg' }, '已监控') : null,
+                    w.extracted ? h('span', {
+                      className: 'htx-tag htx-tagExtracted',
+                      title: `已提取 ${w.extracted.stocks?.length || 0} 只（${String(w.extracted.at || '').slice(5, 16).replace('T', ' ')}）`,
+                    }, `已提取${w.extracted.stocks?.length ? ` ${w.extracted.stocks.length}` : ''}`) : null),
+                  h('div', { className: 'htx-tlSum', style: { WebkitLineClamp: 4 } }, (w.text || '').replace(/\s+/g, ' ').trim()),
+                  w.extracted?.stocks?.length ? h('div', { className: 'htx-reasonChips', style: { marginTop: 3 } },
+                    w.extracted.stocks.map((st) => h('span', { key: st.code, className: 'htx-reasonChip', title: st.code }, st.name || st.code))) : null)))) : null,
 
             // ===== 公告：分类统计 chips + 分类标记列表 =====
             type === 'announcement' ? h('div', null,
@@ -2106,6 +2138,39 @@ POST /api
     "source": "eastmoney"
   }
 }`,
+      },
+      {
+        op: 'weibo', title: '微博监控（Weibo Crawler 本地服务）',
+        params: [
+          ['action', 'string', '否', 'list 查看（默认）/ extract 提取股票'],
+          ['page / pageSize', 'number', '否', '分页，pageSize 1~50'],
+          ['userId', 'string', '否', '按博主 user_id 过滤'],
+          ['keyword', 'string', '否', '关键词过滤'],
+          ['days', 'number', '否', '只看最近 N 天'],
+          ['batch', 'number', '否', 'extract 时本次处理条数 1~50，默认 20'],
+        ],
+        req: `# 列表（需本地 Weibo Crawler：127.0.0.1:15001）
+GET /api?op=weibo&pageSize=10
+GET /api?op=weibo&keyword=DRAM&days=3
+
+# 提取股票（仅 Harness 内可用：需要模型通道）
+POST /api/hitrading
+{"op":"weibo.extract","args":{"batch":20}}`,
+        res: `// list
+{ "ok": true, "value": {
+  "items": [{ "id":"5364156417184832", "screenName":"专业证券分析",
+              "text":"君正股份：DRAM目前需求仍然旺盛…", "createdAt":"2026-11-11 19:53:34",
+              "attitudes":0, "comments":0, "reposts":0,
+              "extracted": { "at":"2026-11-11T20:00:00Z",
+                             "stocks":[{"code":"300223","name":"君正股份"}] } }],
+  "total": 601, "bloggers": [{ "userId":"6067225218", "name":"专业证券分析" }] } }
+
+// extract
+{ "ok": true, "value": {
+  "processed": 6, "pendingLeft": 190, "withStocks": 3,
+  "added":   [{ "code":"600150", "name":"中国船舶" }],
+  "updated": [{ "code":"300223", "name":"君正股份" }],
+  "message": "已处理 6 条微博，新增 1 只、更新 1 只" } }`,
       },
       {
         op: 'powerful', title: '强势股（当日涨幅 > 7%，最近 10 个交易日）',
@@ -2470,6 +2535,10 @@ curl -X POST http://127.0.0.1:8099/api \\
       {
         tool: 'hitrading_portfolio', desc: '本地持仓与盈亏（不接券商）',
         prompts: ['记录持仓 600519 100股 成本1400', '看看我持仓的盈亏'],
+      },
+      {
+        tool: 'hitrading_weibo', desc: '微博监控 + 提取股票（模型解析后写入自选）',
+        prompts: ['看看微博上有什么新消息', '把微博里提到的股票提取出来加到自选'],
       },
       {
         tool: 'hitrading_news', desc: '快讯 / 个股公告 / 龙虎榜',

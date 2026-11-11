@@ -4,6 +4,7 @@
 // 启动：node server.js   配置：HITRADING_PORT / HITRADING_TOKEN / HITRADING_DB
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { getWeibos } from './lib/weibo.js';
 import { runOp } from './lib/ops.js';
 import { openStore, defaultDbPath } from './lib/db.js';
 
@@ -20,6 +21,7 @@ const tables = {
   positions: store.table('positions'),
   alerts: store.table('alerts'),
   powerful: store.table('powerful'),
+  weibo: store.table('weibo'),
 };
 
 const json = (res, status, payload) => {
@@ -105,6 +107,13 @@ const server = createServer(async (req, res) => {
     }
 
     if (!op) return json(res, 400, { ok: false, error: 'missing op' });
+
+    // 微博提取依赖 Harness 的模型通道，独立服务不可用
+    if (op === 'weibo.extract') {
+      return json(res, 400, { ok: false, error: '微博提取需要使用 Harness 内的面板或 Agent 工具（独立服务没有模型通道）' });
+    }
+    // weibo 列表附带提取标记
+    if (op === 'weibo') return json(res, 200, { ok: true, value: await getWeibos(args, tables) });
 
     const value = await runOp(op, args, tables);
     return json(res, 200, { ok: true, value });
