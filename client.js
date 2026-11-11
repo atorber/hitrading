@@ -554,6 +554,14 @@ window.__ModuleLoader__.load({
       { value: 'trading', label: '交易股' },
     ];
     const tierLabel = (v) => (TIER_OPTIONS.find((t) => t.value === v) || TIER_OPTIONS[0]).label;
+    /** 领域分类（单选，''=未分类）。 */
+    const DOMAIN_OPTIONS = [
+      { value: 'finance', label: '大金融' },
+      { value: 'consumer', label: '消费' },
+      { value: 'cyclical', label: '周期' },
+      { value: 'tech', label: '科技' },
+    ];
+    const domainLabel = (v) => (DOMAIN_OPTIONS.find((d) => d.value === v) || {}).label || '未分类';
 
     /** 从用户输入提取 6 位代码：支持逗号/空格/换行分隔，批量粘贴。 */
     const parseSymbols = (raw) => {
@@ -571,8 +579,10 @@ window.__ModuleLoader__.load({
     function MarketView() {
       const [symbol, setSymbol] = useState('');
       const [newTier, setNewTier] = useState('basic');
+      const [newDomain, setNewDomain] = useState('');   // 添加时的领域分类（''=未分类）
       const [newTagList, setNewTagList] = useState([]);   // 添加时的新标签（数组）
       const [tierSel, setTierSel] = useState(null);   // null=不过滤；数组=命中的 tier（多选）
+      const [domainSel, setDomainSel] = useState(null); // null=不过滤；数组=命中的领域（多选）
       const [tagSel, setTagSel] = useState(null);       // null=不过滤；数组=任一命中的标签（多选 OR）
       const [detail, setDetail] = useState(null);
       const [busy, setBusy] = useState(false);
@@ -623,7 +633,7 @@ window.__ModuleLoader__.load({
         setSymbol('');
         setBusy(true);
         try {
-          const v = await api('watchlist.add', { symbols: [item.code], tier: newTier, tags: newTagList });
+          const v = await api('watchlist.add', { symbols: [item.code], tier: newTier, domain: newDomain || undefined, tags: newTagList });
           list.reload();
           if (v.added?.length) notifyOk(`已加入 ${item.name}(${item.code})`);
           else if (v.existed?.length) notifyWarn(`${item.code} 已在自选（保留原关注度与标签）`);
@@ -635,8 +645,9 @@ window.__ModuleLoader__.load({
         if (!codes.length) { notifyError('请输入有效的 6 位 A股代码（如 600519）'); return; }
         setBusy(true);
         try {
-          const v = await api('watchlist.add', { symbols: codes, tier: newTier, tags: newTagList });
+          const v = await api('watchlist.add', { symbols: codes, tier: newTier, domain: newDomain || undefined, tags: newTagList });
           setSymbol('');
+          setNewDomain('');
           list.reload();
           if (v.added && v.added.length) notifyOk(`已加入 ${v.added.map((x) => `${x.name}(${x.symbol})`).join('、')}`);
           else if (v.existed && v.existed.length) notifyWarn(`已在自选：${v.existed.map((x) => x.symbol).join('、')}（保留原关注度与标签）`);
@@ -650,6 +661,14 @@ window.__ModuleLoader__.load({
       };
       const setTier = async (code, tier) => {
         try { await api('watchlist.setTier', { symbols: [code], tier }); list.reload(); } catch (e) { notifyError(e.message); }
+      };
+      const setDomain = async (code, domain) => {
+        try {
+          await api('watchlist.setDomain', { symbols: [code], domain: domain || '' });
+          list.reload();
+          const label = DOMAIN_OPTIONS.find((d) => d.value === domain)?.label;
+          notifyOk(label ? `${code} 领域已设为「${label}」` : `${code} 已清除领域分类`);
+        } catch (e) { notifyError(e.message); }
       };
       const removeTag = async (code, tag) => {
         const r = items.find((x) => x.symbol === code);
@@ -742,6 +761,25 @@ window.__ModuleLoader__.load({
           }, TIER_OPTIONS.map((o) => h('option', { key: o.value, value: o.value }, o.label))),
         },
         {
+          label: '领域',
+          headerTitle: '领域分类（单选：大金融/消费/周期/科技，可空）',
+          filter: {
+            options: [
+              { value: '', label: '未分类', count: (list.value?.items || []).filter((i) => !i.domain).length },
+              ...DOMAIN_OPTIONS.map((o) => ({ value: o.value, label: o.label, count: (list.value?.items || []).filter((i) => i.domain === o.value).length })),
+            ],
+            selected: domainSel,
+            onChange: setDomainSel,
+          },
+          render: (r) => h('select', {
+            className: 'htx-input htx-tierSel', value: r.domain || '',
+            title: '设置领域分类',
+            onChange: (e) => setDomain(r.symbol, e.target.value),
+          },
+            h('option', { key: '', value: '' }, '未分类'),
+            DOMAIN_OPTIONS.map((o) => h('option', { key: o.value, value: o.value }, o.label))),
+        },
+        {
           label: '标签',
           filter: {
             options: (list.value?.tagCloud || []).map((t) => ({ value: t.tag, label: t.tag, count: t.count })),
@@ -763,6 +801,7 @@ window.__ModuleLoader__.load({
       // 客户端多选过滤：关注度（命中任一）→ 标签（命中任一，OR）
       const filtered = items
         .filter((i) => (tierSel == null ? true : tierSel.includes(i.tier || 'basic')))
+        .filter((i) => (domainSel == null ? true : domainSel.includes(i.domain || '')))
         .filter((i) => (tagSel == null ? true : (i.tags || []).some((t) => tagSel.includes(t))));
 
       const sortCol = sort.key && sort.dir ? columns.find((c) => c.label === sort.key) : null;
@@ -816,6 +855,10 @@ window.__ModuleLoader__.load({
           h(Field, { label: '关注度' },
             h('select', { className: 'htx-input', value: newTier, onChange: (e) => setNewTier(e.target.value) },
               TIER_OPTIONS.map((o) => h('option', { key: o.value, value: o.value }, o.label)))),
+          h(Field, { label: '领域' },
+            h('select', { className: 'htx-input', value: newDomain, onChange: (e) => setNewDomain(e.target.value), title: '领域分类（可选）' },
+              h('option', { key: '', value: '' }, '未分类'),
+              DOMAIN_OPTIONS.map((o) => h('option', { key: o.value, value: o.value }, o.label)))),
           h(Field, { label: '标签' },
             h(TagEditor, { value: newTagList, onChange: setNewTagList, allTags: allTagList })),
           h('button', { className: 'htx-btn htx-btnPrimary', disabled: busy, onClick: add }, busy ? '加入中…' : '加入自选'),
@@ -825,6 +868,23 @@ window.__ModuleLoader__.load({
             list.error ? h('span', { className: 'htx-metaWarn', title: `刷新失败：${list.error}` }, ' · 刷新失败') : null),
           h(RefreshBtn, { busy: list.refreshing, onClick: () => list.reload() }),
         ),
+        // 领域快速筛选：单选切换（与表头 ColFilter 共享 domainSel）
+        h('div', { className: 'htx-chipRow' },
+          h('span', { className: 'htx-tagCloudLabel' }, '领域'),
+          [{ value: '', label: '未分类' }, ...DOMAIN_OPTIONS].map((o) => {
+            const on = domainSel != null && domainSel.includes(o.value);
+            const count = items.filter((i) => (i.domain || '') === o.value).length;
+            return h('button', {
+              key: o.value || 'none', type: 'button',
+              className: 'htx-tag' + (on ? ' htx-tagOn' : ''),
+              title: on ? '点击取消该领域筛选' : `点击只看${o.label}（${count} 只）`,
+              onClick: () => setDomainSel(on ? (domainSel.length > 1 ? domainSel.filter((x) => x !== o.value) : null) : [o.value]),
+            }, `${o.label} ${count}`);
+          }),
+          domainSel != null && domainSel.length ? h('button', {
+            type: 'button', className: 'htx-tag', style: { borderStyle: 'dashed' },
+            onClick: () => setDomainSel(null),
+          }, '清除') : null),
         // 标签快速筛选：单选切换（再点取消；与表头多选菜单共享 tagSel）
         allTagList.length ? h('div', { className: 'htx-chipRow' },
           h('span', { className: 'htx-tagCloudLabel' }, '标签'),
@@ -846,7 +906,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '当前显示'), h('p', { className: 'htx-metricValue' }, `${filtered.length}${filtered.length !== items.length ? ` / ${items.length}` : ''}`)),
           h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '今日上涨'), h('p', { className: 'htx-metricValue htx-up' }, String(upCount))),
           h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '今日下跌'), h('p', { className: 'htx-metricValue htx-down' }, String(downCount))),
-          (tierSel || tagSel) ? h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '筛选'), h('p', { className: 'htx-metricValue' }, `${tierSel ? `关注度 ${tierSel.length}` : ''}${tierSel && tagSel ? ' · ' : ''}${tagSel ? `标签 ${tagSel.length}` : ''}`)) : null,
+          (tierSel || domainSel || tagSel) ? h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '筛选'), h('p', { className: 'htx-metricValue' }, [tierSel ? `关注度 ${tierSel.length}` : '', domainSel ? `领域 ${domainSel.length}` : '', tagSel ? `标签 ${tagSel.length}` : ''].filter(Boolean).join(' · '))) : null,
         ) : null,
         // 数据优先：已有数据就一直显示表格（静默刷新只换数据），仅首次加载才转圈/报错
         list.value == null
@@ -1954,7 +2014,7 @@ POST /api
 }`,
       },
       {
-        op: 'watchlist.list / add / remove / setTier / setTags', title: '自选股 查 / 增 / 删 / 设关注度 / 设标签',
+        op: 'watchlist.list / add / remove / setTier / setDomain / setTags', title: '自选股 查 / 增 / 删 / 设关注度 / 设领域 / 设标签',
         params: [
           ['op', 'string', '是', 'list 查询 / add 新增 / remove 删除 / setTier 设置关注度 / setTags 设置标签'],
           ['symbols', 'string[]', '增删改时是', 'A股代码数组；GET 用逗号分隔'],

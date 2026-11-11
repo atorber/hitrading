@@ -160,23 +160,29 @@ curl -s "http://127.0.0.1:8099/api?op=backtest&symbol=000001&strategy=ma_cross&l
 
 ### 自选股
 
-自选股支持**关注度**分级（`basic` 基础股（默认）/ `selected` 精选股 / `trading` 交易股）与**多标签**（每只≤10个，单个≤12字）。
+自选股支持**关注度**分级（`basic` 基础股（默认）/ `selected` 精选股 / `trading` 交易股）、**领域分类**（单选，可空：`finance` 大金融 / `consumer` 消费 / `cyclical` 周期 / `tech` 科技）与**多标签**（每只≤10个，单个≤12字）。
 
 ```bash
 # 查询（含实时行情）
 curl -s "http://127.0.0.1:8099/api?op=watchlist.list"
 
-# 按关注度或标签过滤
+# 按关注度、领域或标签过滤（domain=none 查未分类）
 curl -s "http://127.0.0.1:8099/api?op=watchlist.list&tier=selected"
+curl -s "http://127.0.0.1:8099/api?op=watchlist.list&domain=tech"
+curl -s "http://127.0.0.1:8099/api?op=watchlist.list&domain=none"
 curl -s "http://127.0.0.1:8099/api?op=watchlist.list&tag=白酒"
 
-# 新增（可指定关注度与标签）
+# 新增（可指定关注度、领域与标签）
 curl -s -X POST http://127.0.0.1:8099/api -H "Content-Type: application/json" \
-  -d '{"op":"watchlist.add","args":{"symbols":["600519","000001"],"tier":"selected","tags":["白酒","核心资产"]}}'
+  -d '{"op":"watchlist.add","args":{"symbols":["600519","000001"],"tier":"selected","domain":"consumer","tags":["白酒","核心资产"]}}'
 
 # 修改关注度
 curl -s -X POST http://127.0.0.1:8099/api -H "Content-Type: application/json" \
   -d '{"op":"watchlist.setTier","args":{"symbols":["600519"],"tier":"trading"}}'
+
+# 设置领域分类（单选；传空 domain 清除）
+curl -s -X POST http://127.0.0.1:8099/api -H "Content-Type: application/json" \
+  -d '{"op":"watchlist.setDomain","args":{"symbols":["600519"],"domain":"consumer"}}'
 
 # 设置标签（全量替换）
 curl -s -X POST http://127.0.0.1:8099/api -H "Content-Type: application/json" \

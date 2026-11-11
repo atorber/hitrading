@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { normalizeSymbols } from './lib/symbol.js';
 import { getQuotes } from './lib/quotes.js';
 import { openStore } from './lib/db.js';
-import { runOp, strategies, TIERS, PCT_N } from './lib/ops.js';
+import { runOp, strategies, TIERS, DOMAINS, PCT_N } from './lib/ops.js';
 
 const SKILL_PATH = new URL('./skills/hitrading/SKILL.md', import.meta.url);
 /** 独立 HTTP 服务脚本的绝对路径（与插件同目录）。 */
@@ -147,6 +147,7 @@ function renderWatchlist(v) {
     { label: '现价', render: (r) => r.price }, { label: '涨跌幅%', render: (r) => r.pctChange },
     ...tnCols,
     { label: '关注度', render: (r) => TIERS[r.tier] ?? '基础股' },
+    { label: '领域', render: (r) => DOMAINS[r.domain] ?? '-' },
     { label: '标签', render: (r) => (r.tags?.length ? r.tags.join('、') : '-') },
     { label: '加入时间', render: (r) => r.addedAt?.slice(0, 10) },
   ], '自选股为空。');
@@ -329,18 +330,19 @@ export function apply(ctx) {
   // 6) 自选
   ctx.tools.register(defineTool({
     name: 'hitrading_watchlist',
-    description: '管理自选股：加入、移除、查看（含实时行情），可为每只设置关注度（基础股/精选股/交易股，默认基础股）与多个标签（如 ["白酒","核心资产"]），并可按关注度或标签筛选。',
+    description: '管理自选股：加入、移除、查看（含实时行情），可为每只设置关注度（基础股/精选股/交易股，默认基础股）、领域分类（大金融/消费/周期/科技，单选，默认空）与多个标签（如 ["白酒","核心资产"]），并可按关注度、领域或标签筛选。',
     parameters: {
-      action: { type: 'string', required: true, enum: ['add', 'remove', 'list', 'set-tier', 'set-tags'], description: 'add 加入 / remove 移除 / list 查看 / set-tier 设置关注度 / set-tags 设置标签' },
-      symbols: { type: 'array', items: { type: 'string' }, description: '6 位 A股代码数组（add/remove/set-tier/set-tags 时必填）' },
+      action: { type: 'string', required: true, enum: ['add', 'remove', 'list', 'set-tier', 'set-tags', 'set-domain'], description: 'add 加入 / remove 移除 / list 查看 / set-tier 设置关注度 / set-tags 设置标签 / set-domain 设置领域分类' },
+      symbols: { type: 'array', items: { type: 'string' }, description: '6 位 A股代码数组（add/remove/set-tier/set-tags/set-domain 时必填）' },
       tier: { type: 'string', enum: ['basic', 'selected', 'trading'], description: '关注度：basic 基础股（默认）/ selected 精选股 / trading 交易股；add 与 set-tier 可用' },
+      domain: { type: 'string', enum: ['finance', 'consumer', 'cyclical', 'tech'], description: '领域分类（单选）：finance 大金融 / consumer 消费 / cyclical 周期 / tech 科技；add 与 set-domain 可用，set-domain 传空清除' },
       tags: { type: 'array', items: { type: 'string' }, description: '标签数组（每只最多 10 个，单个≤12字）：add 时随新增写入；set-tags 时全量替换' },
       tag: { type: 'string', description: 'list 时按单个标签过滤，如 tag=白酒' },
     },
     output: { schema: { type: 'json' }, render: (_a, v) => [{ type: 'text', text: renderWatchlist(v) }] },
-    execute: ({ action, symbols, tier, tags, tag }) => runOp(
-      action === 'set-tier' ? 'watchlist.setTier' : action === 'set-tags' ? 'watchlist.setTags' : `watchlist.${action}`,
-      { symbols, tier, tags, tag },
+    execute: ({ action, symbols, tier, domain, tags, tag }) => runOp(
+      action === 'set-tier' ? 'watchlist.setTier' : action === 'set-domain' ? 'watchlist.setDomain' : action === 'set-tags' ? 'watchlist.setTags' : `watchlist.${action}`,
+      { symbols, tier, domain, tags, tag },
       tables,
     ),
     presentCall: (a) => ({ card: 'generic', title: '自选股管理', rawInput: a }),
