@@ -198,6 +198,44 @@ window.__ModuleLoader__.load({
 .htx-kvItem b{color:var(--dsw-alias-label-secondary);font-weight:500}
 
 /* 列表（资讯） */
+/* 资讯页重构：时间轴 / 分类 chips / 龙虎榜图 */
+.htx-tl{position:relative;list-style:none;margin:0;padding:0 0 0 74px}
+.htx-tl:before{content:"";position:absolute;inset-block:6px;left:62px;width:1px;background:var(--dsw-alias-border-l3)}
+.htx-tl>li{position:relative;padding:5px 0 12px}
+.htx-tlTime{position:absolute;left:-74px;top:6px;width:52px;text-align:right;font-size:11px;font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-tertiary);line-height:1.5}
+.htx-tlDot{position:absolute;left:-15.5px;top:11px;width:7px;height:7px;border-radius:50%;background:var(--dsw-alias-border-l3);box-shadow:0 0 0 2px var(--dsw-alias-bg-base)}
+.htx-tl>li.reg .htx-tlDot{background:var(--dsw-alias-state-error-primary)}
+.htx-tl>li.macro .htx-tlDot{background:var(--dsw-alias-state-business-primary)}
+.htx-tl>li.mkt .htx-tlDot{background:var(--dsw-alias-state-warn-primary)}
+.htx-tlTitle{font-size:12.5px;font-weight:600;color:var(--dsw-alias-label-primary);line-height:1.55;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.htx-tlSum{font-size:11.5px;color:var(--dsw-alias-label-tertiary);line-height:1.6;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.htx-tlDate{margin:10px 0 4px;font-size:11px;font-weight:600;color:var(--dsw-alias-label-tertiary);letter-spacing:.04em}
+.htx-tl>li:first-child .htx-tlDate{margin-top:0}
+.htx-catChips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px}
+.htx-catChip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:999px;border:1px solid var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-base);font:inherit;font-size:11.5px;color:var(--dsw-alias-label-secondary);cursor:pointer;line-height:1}
+.htx-catChip:hover{color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-label-tertiary)}
+.htx-catChip[aria-pressed=true]{border-color:var(--dsw-alias-state-business-primary);color:var(--dsw-alias-state-business-primary);background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 8%,transparent);font-weight:600}
+.htx-catChip b{font-weight:650;font-variant-numeric:tabular-nums}
+.htx-tag{display:inline-flex;align-items:center;height:16px;padding:0 6px;border-radius:5px;font-size:10px;font-weight:600;line-height:1;white-space:nowrap}
+.htx-tagReg{color:var(--dsw-alias-state-error-primary);background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 10%,transparent)}
+.htx-tagMacro{color:var(--dsw-alias-state-business-primary);background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 10%,transparent)}
+.htx-tagMkt{color:var(--dsw-alias-state-warn-primary);background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 12%,transparent)}
+.htx-tagOther{color:var(--dsw-alias-label-tertiary);background:var(--dsw-specific-sidebar-fill)}
+.htx-sumCard{border:1px solid var(--dsw-alias-border-l3);border-inline-start:3px solid var(--dsw-alias-state-business-primary);border-radius:10px;padding:10px 14px;font-size:12px;line-height:1.7;color:var(--dsw-alias-label-secondary);margin-bottom:12px;background:var(--dsw-alias-bg-base)}
+.htx-sumCard b{color:var(--dsw-alias-label-primary);font-weight:650}
+.htx-sumCard .htx-up,.htx-sumCard .htx-down{font-weight:650}
+.htx-lhbChart{display:flex;flex-direction:column;gap:7px;margin:2px 0 4px}
+.htx-lhbRow{display:grid;grid-template-columns:76px 1fr 76px;gap:10px;align-items:center;cursor:pointer;border-radius:8px;padding:2px 4px}
+.htx-lhbRow:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.htx-lhbName{font-size:12px;font-weight:600;color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.htx-lhbTrack{position:relative;height:14px;border-radius:4px;background:var(--dsw-specific-sidebar-fill)}
+.htx-lhbTrack:before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--dsw-alias-border-l3)}
+.htx-lhbBar{position:absolute;top:1px;bottom:1px;border-radius:3px;min-width:2px}
+.htx-lhbBar.buy{left:50%;background:linear-gradient(90deg,color-mix(in srgb,var(--dsw-alias-state-error-primary) 55%,transparent),var(--dsw-alias-state-error-primary))}
+.htx-lhbBar.sell{right:50%;background:linear-gradient(270deg,color-mix(in srgb,var(--dsw-alias-state-success-primary) 55%,transparent),var(--dsw-alias-state-success-primary))}
+.htx-lhbAmt{font-size:11.5px;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.htx-reasonChips{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+.htx-reasonChip{font-size:10.5px;line-height:1.5;color:var(--dsw-alias-label-tertiary);background:var(--dsw-specific-sidebar-fill);border:1px solid var(--dsw-alias-border-l3);border-radius:5px;padding:1px 6px}
 .htx-list{list-style:none;margin:0;padding:0}
 .htx-list li{padding:8px 4px;border-bottom:.5px solid var(--dsw-alias-border-l3);font-size:12.5px;line-height:1.7}
 .htx-listDate{color:var(--dsw-alias-label-tertiary);margin-right:8px;font-variant-numeric:tabular-nums}
@@ -1301,27 +1339,225 @@ window.__ModuleLoader__.load({
       const [type, setType] = useState('news');
       const [symbol, setSymbol] = useState('');
       const [run, setRun] = useState({ type: 'news', count: 30 });
+      const [cat, setCat] = useState(null);            // 选中的分类 key（null = 全部）
       const data = useData(() => api('news', run), [run]);
-      const search = (t, s) => setRun({ type: t, ...(s != null && s !== '' ? { symbol: s } : {}), count: 30 });
+      const search = (t, sy) => { setType(t); setCat(null); setRun({ type: t, ...(sy ? { symbol: sy } : {}), count: 30 }); };
       const items = data.value?.items || [];
+
+      // —— 分类规则：先命中先归类 ——
+      const NEWS_CATS = [
+        { key: 'reg', label: '监管动态', words: ['证监会', '交易所', '上交所', '深交所', '北交所', '立案', '处罚', '监管函', '问询', '纪律处分', '先行赔付', '违法', '虚假陈述'] },
+        { key: 'macro', label: '宏观', words: ['央行', '美联储', '国务院', '财政部', '统计局', 'GDP', 'CPI', 'PMI', 'LPR', '降准', '降息', '加息', '外汇', '汇率', '国债', '关税', '伊朗', '中东'] },
+        { key: 'mkt', label: '市场行情', words: ['指数', '沪指', '深成指', '创业板', '科创', '涨停', '跌停', '成交额', '北向', '两融', '期货', '黄金', '原油', '钯金', '美元', '盎司', '涨%', '跌%'] },
+      ];
+      const ANN_CATS = [
+        { key: 'perf', label: '业绩报告', words: ['业绩', '季报', '半年报', '年报', '快报', '预告', '说明会'] },
+        { key: 'incentive', label: '股权激励', words: ['激励', '员工持股'] },
+        { key: 'ma', label: '投资并购', words: ['重组', '收购', '合并', '要约', '购买', '出售资产', '对外投资', '土地', '项目'] },
+        { key: 'shares', label: '增减持回购', words: ['增持', '减持', '回购', '质押'] },
+        { key: 'dividend', label: '分红派息', words: ['分红', '派息', '利润分配', '权益分派'] },
+        { key: 'raise', label: '融资发行', words: ['定增', '非公开发行', '发行', '募集', '可转债'] },
+        { key: 'gov', label: '公司治理', words: ['股东会', '董事会', '监事会', '决议', '法律意见', '章程', '换届', '提名', '自查'] },
+      ];
+      const classify = (item) => {
+        const text = `${item.title || ''}${item.summary || ''}`;
+        const cats = type === 'news' ? NEWS_CATS : ANN_CATS;
+        for (const c of cats) if (c.words.some((w) => text.includes(w))) return c;
+        return null;
+      };
+      const catLabel = (key) => (type === 'news' ? NEWS_CATS : ANN_CATS).find((c) => c.key === key)?.label || '其他';
+      const catClass = (key) => (key === 'reg' ? 'htx-tagReg' : key === 'macro' ? 'htx-tagMacro' : key === 'mkt' ? 'htx-tagMkt' : 'htx-tagOther');
+      const withCat = items.map((n) => {
+        const c = classify(n);
+        return { ...n, cat: c ? c.key : 'other', catLabel: c ? c.label : '其他' };
+      });
+      const catCount = (key) => withCat.filter((x) => x.cat === key).length;
+      const cats = (type === 'news' ? NEWS_CATS : ANN_CATS).map((c) => ({ ...c, count: catCount(c.key) })).filter((c) => c.count > 0);
+      const otherCount = withCat.filter((x) => x.cat === 'other').length;
+      const filtered = cat ? withCat.filter((x) => x.cat === cat) : withCat;
+
+      const quickAdd = async (code) => {
+        try {
+          const v = await api('watchlist.add', { symbols: [code] });
+          if (v.added?.length) notifyOk(`已加入自选：${code}`);
+          else notifyWarn(`${code} 已在自选`);
+        } catch (e) { notifyError(e.message); }
+      };
+      const yi = (v) => (v / 1e8).toFixed(2);
+      const pct = (v) => (v == null ? '-' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`);
+
+      // —— 龙虎榜：按代码聚合（同一股票可因多个原因上榜，金额为同日同一笔，不重复计）——
+      const lhbAgg = (() => {
+        if (type !== 'lhb') return { rows: [], buyers: [], sellers: [], dates: [] };
+        const map = new Map();
+        for (const it of items) {
+          const cur = map.get(it.code);
+          if (!cur) { map.set(it.code, { ...it, reasons: [it.reason || '—'] }); continue; }
+          if (it.reason && !cur.reasons.includes(it.reason)) cur.reasons.push(it.reason);
+          if (Math.abs(it.netBuyAmt) > Math.abs(cur.netBuyAmt)) { cur.netBuyAmt = it.netBuyAmt; cur.buyAmt = it.buyAmt; cur.sellAmt = it.sellAmt; }
+        }
+        const rows = [...map.values()];
+        const buyers = rows.filter((x) => x.netBuyAmt > 0).sort((a, b) => b.netBuyAmt - a.netBuyAmt);
+        const sellers = rows.filter((x) => x.netBuyAmt <= 0).sort((a, b) => a.netBuyAmt - b.netBuyAmt);
+        const dates = [...new Set(items.map((x) => x.date))].sort().reverse();
+        return { rows, buyers, sellers, dates };
+      })();
+      const topBuy = lhbAgg.buyers[0];
+      const topSell = lhbAgg.sellers[0];
+      const sumBuy = lhbAgg.buyers.reduce((a, b) => a + b.netBuyAmt, 0);
+      const sumSellAbs = Math.abs(lhbAgg.sellers.reduce((a, b) => a + b.netBuyAmt, 0));
+      const chartRows = [
+        ...lhbAgg.buyers.slice(0, 7),
+        ...lhbAgg.sellers.slice(0, 5),
+      ].sort((a, b) => b.netBuyAmt - a.netBuyAmt);
+      const maxAbs = Math.max(1, ...chartRows.map((r) => Math.abs(r.netBuyAmt)));
+
+      // —— 快讯：时间轴分组 ——
+      const newsGroups = (() => {
+        if (type !== 'news') return [];
+        const groups = [];
+        let cur = null;
+        for (const n of filtered) {
+          const date = (n.showTime || '').slice(0, 10) || '未知';
+          if (!cur || cur.date !== date) { cur = { date, items: [] }; groups.push(cur); }
+          cur.items.push(n);
+        }
+        return groups;
+      })();
+      const lastHourCount = withCat.filter((n) => {
+        const t = Date.now() - new Date((n.showTime || '').replace(' ', 'T') + '+08:00').getTime();
+        return t >= 0 && t < 3600_000;
+      }).length;
+      const regCount = catCount('reg');
+      const macroCount = catCount('macro');
+
+      // —— 公告：分类统计 ——
+      const annStats = type === 'announcement' ? cats.map((c) => ({ ...c })) : [];
+
+      const columns = type === 'lhb' ? [
+        { label: '名称', render: (r) => h('span', { style: { fontWeight: 600 } }, r.name) },
+        { label: '代码', render: (r) => h('span', { style: { fontVariantNumeric: 'tabular-nums', color: 'var(--dsw-alias-label-tertiary)' } }, r.code) },
+        { label: '收盘', render: (r) => r.close, align: 'right' },
+        { label: '涨跌幅', render: (r) => pct(r.changeRate), className: (r) => (r.changeRate >= 0 ? 'htx-up' : 'htx-down'), align: 'right' },
+        { label: '净买额(亿)', render: (r) => yi(r.netBuyAmt), className: (r) => (r.netBuyAmt >= 0 ? 'htx-up' : 'htx-down'), align: 'right', sortable: true, sortValue: (r) => r.netBuyAmt },
+        { label: '总成交(亿)', render: (r) => ((r.buyAmt + r.sellAmt) / 2 / 1e8).toFixed(2), align: 'right' },
+        { label: '换手%', render: (r) => r.turnover, align: 'right' },
+        { label: '上榜原因', render: (r) => h('div', { className: 'htx-reasonChips' }, r.reasons.slice(0, 3).map((x, i) => h('span', { key: i, className: 'htx-reasonChip', title: x }, x.length > 18 ? x.slice(0, 17) + '…' : x))) },
+        { label: '', render: (r) => h('button', { className: 'htx-btn htx-btnSm', onClick: () => quickAdd(r.code) }, '+ 自选') },
+      ] : null;
+      const [lhbSort, setLhbSort] = useState({ key: null, dir: null });
+      const onLhbSort = (key) => setLhbSort((s0) => (s0.key !== key ? { key, dir: 'desc' } : s0.dir === 'desc' ? { key, dir: 'asc' } : { key: null, dir: null }));
+      const lhbSortCol = type === 'lhb' && lhbSort.key && lhbSort.dir ? columns.find((c) => c.label === lhbSort.key) : null;
+      const lhbRows = lhbSortCol && lhbSortCol.sortValue
+        ? [...lhbAgg.rows].sort((a, b) => {
+            const va = lhbSortCol.sortValue(a), vb = lhbSortCol.sortValue(b);
+            if (va == null && vb == null) return 0;
+            if (va == null) return 1;
+            if (vb == null) return -1;
+            return lhbSort.dir === 'asc' ? va - vb : vb - va;
+          })
+        : lhbAgg.rows;
+
+      const tagFor = (key) => h('span', { className: `htx-tag ${catClass(key)}` }, catLabel(key));
+
       return h('div', null,
         h('div', { className: 'htx-toolbar' },
           h(Field, { label: '资讯类型' },
             h(Seg, {
               ariaLabel: '资讯类型',
               value: type,
-              onChange: (t) => { setType(t); search(t, t === 'announcement' ? symbol.trim() : ''); },
+              onChange: (t) => search(t, t === 'announcement' ? symbol.trim() : ''),
               options: [{ value: 'news', label: '快讯' }, { value: 'lhb', label: '龙虎榜' }, { value: 'announcement', label: '公告' }],
             })),
           type === 'announcement' ? h(Field, { label: '代码（可空）' },
             h('span', { style: { display: 'flex', gap: 4 } },
               h('input', { className: 'htx-input', style: { width: 110 }, placeholder: '600519', value: symbol, onChange: (e) => setSymbol(e.target.value), onKeyDown: (e) => e.key === 'Enter' && search('announcement', symbol.trim()) }),
               h('button', { className: 'htx-btn htx-btnSm', onClick: () => search('announcement', symbol.trim()) }, '查询'))) : null,
-          h('span', { className: 'htx-meta' }, `${data.value?.title || ''} ${items.length} 条`)),
+          h('span', { className: 'htx-meta' }, `${data.value?.title || ''} ${items.length} 条`,
+            data.updatedAt ? ` · ${new Date(data.updatedAt).toLocaleTimeString('zh-CN', { hour12: false })}` : '',
+            data.error ? h('span', { className: 'htx-metaWarn', title: `刷新失败：${data.error}` }, ' · 刷新失败') : null),
+          h(RefreshBtn, { busy: data.refreshing, onClick: () => data.reload() })),
+
         data.error ? h(ErrorBox, { error: data.error }) : data.loading ? h(Spinner)
           : !items.length ? h(Empty, { text: '暂无内容', hint: '换个类型或稍后再试' })
-          : h('ul', { className: 'htx-list' }, items.map((n, i) =>
-              h('li', { key: i }, h('span', { className: 'htx-listDate' }, (n.date || n.showTime || '').slice(0, 10)), n.title || n.summary))));
+          : h('div', null,
+
+            // ===== 龙虎榜：资金摘要 + 分歧图 + 聚合表 =====
+            type === 'lhb' ? h('div', null,
+              h('div', { className: 'htx-sumCard' },
+                h('b', null, `${lhbAgg.rows.length} 家上榜`),
+                `（${lhbAgg.dates.length > 1 ? lhbAgg.dates.join('、') : lhbAgg.dates[0] || ''}）：机构/营业部合计`,
+                h('b', { className: 'htx-up' }, ` 净买 ${yi(sumBuy)} 亿`),
+                '、',
+                h('b', { className: 'htx-down' }, `净卖 ${yi(sumSellAbs)} 亿`),
+                '。资金分歧最大的是 ',
+                topBuy ? h('b', null, `${topBuy.name}（净买 ${yi(topBuy.netBuyAmt)} 亿，${pct(topBuy.changeRate)}）`) : null,
+                topBuy && topSell ? '；' : null,
+                topSell ? h('b', null, `${topSell.name}（净卖 ${yi(Math.abs(topSell.netBuyAmt))} 亿，${pct(topSell.changeRate)}）`) : null,
+                '。'),
+              h('div', { className: 'htx-metrics' },
+                h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '上榜家数'), h('p', { className: 'htx-metricValue' }, String(lhbAgg.rows.length))),
+                h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净买合计(亿)'), h('p', { className: 'htx-metricValue htx-up' }, yi(sumBuy))),
+                h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净卖合计(亿)'), h('p', { className: 'htx-metricValue htx-down' }, yi(sumSellAbs))),
+                topBuy ? h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净买王'), h('p', { className: 'htx-metricValue' }, topBuy.name)) : null,
+                topSell ? h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '净卖王'), h('p', { className: 'htx-metricValue' }, topSell.name)) : null),
+              chartRows.length ? h('div', { className: 'htx-card' },
+                h('h3', { className: 'htx-cardTitle' }, '多空分歧榜（净买 ←→ 净卖，点行加入自选）'),
+                h('div', { className: 'htx-lhbChart' },
+                  chartRows.map((r) => {
+                    const w = `${(Math.abs(r.netBuyAmt) / maxAbs * 50).toFixed(1)}%`;
+                    const buy = r.netBuyAmt > 0;
+                    return h('div', {
+                      key: `${r.code}-${r.reason}`, className: 'htx-lhbRow', title: '点击加入自选',
+                      onClick: () => quickAdd(r.code),
+                    },
+                      h('span', { className: 'htx-lhbName' }, r.name),
+                      h('div', { className: 'htx-lhbTrack' },
+                        h('div', { className: `htx-lhbBar ${buy ? 'buy' : 'sell'}`, style: buy ? { width: w } : { width: w } })),
+                      h('span', { className: `htx-lhbAmt ${buy ? 'htx-up' : 'htx-down'}` }, `${buy ? '+' : ''}${yi(r.netBuyAmt)} 亿`));
+                  }))) : null,
+              lhbRows.length ? h('div', { className: 'htx-card', style: { paddingTop: 10 } },
+                h(DataTable, { columns, rows: lhbRows, getKey: (r) => `${r.code}-${r.reason}`, sort: lhbSort, onSortChange: onLhbSort })) : null) : null,
+
+            // ===== 快讯：摘要 + 分类筛选 + 时间轴 =====
+            type === 'news' ? h('div', null,
+              h('div', { className: 'htx-metrics' },
+                h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '快讯总数'), h('p', { className: 'htx-metricValue' }, String(items.length))),
+                h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '最近 1 小时'), h('p', { className: 'htx-metricValue' }, String(lastHourCount))),
+                h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '监管动态'), h('p', { className: 'htx-metricValue' }, String(regCount))),
+                h('div', { className: 'htx-metric' }, h('p', { className: 'htx-metricLabel' }, '宏观'), h('p', { className: 'htx-metricValue' }, String(macroCount)))),
+              (cats.length || otherCount) ? h('div', { className: 'htx-catChips' },
+                h('button', { type: 'button', className: 'htx-catChip', 'aria-pressed': cat == null, onClick: () => setCat(null) }, '全部', h('b', null, String(withCat.length))),
+                cats.map((c) => h('button', { key: c.key, type: 'button', className: 'htx-catChip', 'aria-pressed': cat === c.key, onClick: () => setCat(cat === c.key ? null : c.key) }, c.label, h('b', null, String(c.count)))),
+                otherCount ? h('button', { type: 'button', className: 'htx-catChip', 'aria-pressed': cat === 'other', onClick: () => setCat(cat === 'other' ? null : 'other') }, '其他', h('b', null, String(otherCount))) : null) : null,
+              regCount ? h('div', { className: 'htx-sumCard', style: { borderInlineStartColor: 'var(--dsw-alias-state-error-primary)' } },
+                h('b', null, '监管动态提醒：'), '近期有 ', h('b', { className: 'htx-up' }, `${regCount} 条监管相关`),
+                ' 快讯——', withCat.filter((x) => x.cat === 'reg').slice(0, 2).map((x) => x.title).join('；') || '',
+                '。相关个股请留意公告与风险提示。') : null,
+              h('ul', { className: 'htx-tl' },
+                newsGroups.flatMap((g0) => [
+                  h('li', { key: `d-${g0.date}`, className: 'htx-tlDate', style: { position: 'static', listStyle: 'none' } }, g0.date),
+                  ...g0.items.map((n, i) => h('li', { key: `${g0.date}-${i}`, className: n.cat === 'other' ? '' : n.cat },
+                    h('span', { className: 'htx-tlTime' }, (n.showTime || '').slice(11, 16)),
+                    h('span', { className: 'htx-tlDot' }),
+                    h('div', { className: 'htx-tlTitle' }, n.title || n.summary, tagFor(n.cat)),
+                    n.summary && n.summary !== n.title ? h('div', { className: 'htx-tlSum' }, n.summary) : null)),
+                ]))) : null,
+
+            // ===== 公告：分类统计 chips + 分类标记列表 =====
+            type === 'announcement' ? h('div', null,
+              annStats.length ? h('div', { className: 'htx-catChips' },
+                h('button', { type: 'button', className: 'htx-catChip', 'aria-pressed': cat == null, onClick: () => setCat(null) }, '全部', h('b', null, String(withCat.length))),
+                annStats.map((c) => h('button', { key: c.key, type: 'button', className: 'htx-catChip', 'aria-pressed': cat === c.key, onClick: () => setCat(cat === c.key ? null : c.key) }, c.label, h('b', null, String(c.count)))),
+                otherCount ? h('button', { type: 'button', className: 'htx-catChip', 'aria-pressed': cat === 'other', onClick: () => setCat(cat === 'other' ? null : 'other') }, '其他', h('b', null, String(otherCount))) : null) : null,
+              h('ul', { className: 'htx-tl', style: { paddingInlineStart: 0 } },
+                filtered.map((n, i) => h('li', { key: i, style: { listStyle: 'none', paddingInlineStart: 0 } },
+                  h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: 8, padding: '7px 4px', borderBottom: '0.5px solid var(--dsw-alias-border-l3)' } },
+                    h('span', { className: 'htx-tlDate', style: { margin: 0, flex: 'none', minWidth: 56 } }, (n.noticeDate || '').slice(0, 10)),
+                    h('span', { className: 'htx-badge htx-badgeFlat', style: { flex: 'none' }, title: n.code || '' }, `${n.name || n.code || '—'}`),
+                    h('div', { style: { flex: 1, minWidth: 0 } },
+                      h('div', { className: 'htx-tlTitle', style: { fontWeight: 500 } }, n.title, tagFor(n.cat))),
+                    h('button', { className: 'htx-btn htx-btnSm', style: { flex: 'none' }, onClick: () => quickAdd(n.code) }, '+ 自选')))))) : null));
     }
 
     // ---------- 预警 ----------
