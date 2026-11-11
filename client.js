@@ -1161,7 +1161,7 @@ window.__ModuleLoader__.load({
     function EnergyView() {
       const [days, setDays] = useState(20);
       const [sort, setSort] = useState({ key: null, dir: null });
-      const data = useData(() => api('energy', { days }), [days], { refreshMs: 60_000 });
+      const data = useData(() => api('energy', { days }), [days], { refreshMs: 120_000 });
       const v = data.value || {};
       const series = v.series || [];
       const st = v.stats || {};
@@ -1319,7 +1319,7 @@ window.__ModuleLoader__.load({
     function PowerfulView() {
       const [date, setDate] = useState('');           // '' = 最新交易日
       const [sort, setSort] = useState({ key: null, dir: null });
-      const data = useData(() => api('powerful', date ? { date } : {}), [date], { refreshMs: 60_000 });
+      const data = useData(() => api('powerful', date ? { date } : {}), [date], { refreshMs: 120_000 });
       const v = data.value || {};
       const items = v.items || [];
       const st = v.stats || {};
@@ -1537,7 +1537,7 @@ window.__ModuleLoader__.load({
       const [onlyWatch, setOnlyWatch] = useState(false);
       const [sort, setSort] = useState({ key: null, dir: null });
       const [adding, setAdding] = useState(null);
-      const data = useData(() => api('news', { type: 'lhb', count: 50 }), [], { refreshMs: 60_000 });
+      const data = useData(() => api('news', { type: 'lhb', count: 50 }), [], { refreshMs: 120_000 });
       const watch = useData(() => api('watchlist.list'), [], { refreshMs: 60000 });
       const items = data.value?.items || [];
 
@@ -1666,7 +1666,7 @@ window.__ModuleLoader__.load({
       const [onlyWatch, setOnlyWatch] = useState(false); // 只看自选相关
       const [wUser, setWUser] = useState(null);          // 微博：选中的博主
       const data = useData(() => api('news', run), [run]);
-      const wb = useData(() => (type === 'weibo' ? api('weibo', { pageSize: 50, ...(wUser ? { userId: wUser } : {}) }) : Promise.resolve(null)), [type, wUser], { refreshMs: 60_000 });
+      const wb = useData(() => (type === 'weibo' ? api('weibo', { pageSize: 50, ...(wUser ? { userId: wUser } : {}) }) : Promise.resolve(null)), [type, wUser], { refreshMs: 120_000 });
       const watchListWb = useData(() => api('watchlist.list'), [], { refreshMs: 60000 });
       const watch = useData(() => api('watchlist.list'), [], { refreshMs: 60000 });
       const search = (t, sy) => { setType(t); setCat(null); setWUser(null); if (t !== 'weibo') setRun({ type: t, ...(sy ? { symbol: sy } : {}), count: 30 }); };
