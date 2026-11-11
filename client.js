@@ -1481,9 +1481,12 @@ window.__ModuleLoader__.load({
       const [run, setRun] = useState({ type: 'news', count: 30 });
       const [cat, setCat] = useState(null);            // 选中的分类 key（null = 全部）
       const [onlyWatch, setOnlyWatch] = useState(false); // 只看自选相关
+      const [wUser, setWUser] = useState(null);          // 微博：选中的博主
       const data = useData(() => api('news', run), [run]);
+      const wb = useData(() => (type === 'weibo' ? api('weibo', { pageSize: 50, ...(wUser ? { userId: wUser } : {}) }) : Promise.resolve(null)), [type, wUser], { refreshMs: 60_000 });
+      const watchListWb = useData(() => api('watchlist.list'), [], { refreshMs: 60000 });
       const watch = useData(() => api('watchlist.list'), [], { refreshMs: 60000 });
-      const search = (t, sy) => { setType(t); setCat(null); setRun({ type: t, ...(sy ? { symbol: sy } : {}), count: 30 }); };
+      const search = (t, sy) => { setType(t); setCat(null); setWUser(null); if (t !== 'weibo') setRun({ type: t, ...(sy ? { symbol: sy } : {}), count: 30 }); };
       const items = data.value?.items || [];
       // 自选股匹配集合：代码 + 名称（快讯正文一般提名称不提代码）
       const watchRows = watch.value?.items || [];
@@ -1526,6 +1529,12 @@ window.__ModuleLoader__.load({
       const cats = (type === 'news' ? NEWS_CATS : ANN_CATS).map((c) => ({ ...c, count: catCount(c.key) })).filter((c) => c.count > 0);
       const otherCount = withCat.filter((x) => x.cat === 'other').length;
       const filtered = cat ? withCat.filter((x) => x.cat === cat) : withCat;
+      // 微博派生：博主筛选 + 已监控博主标记 + 只看自选过滤
+      const wbRaw = (wb.value && wb.value.items) || [];
+      const wbBloggers = (wb.value && wb.value.bloggers) || [];
+      const wbTotalN = (wb.value && wb.value.total) || 0;
+      const wbWatchNames = new Set((watchListWb.value?.items || []).map((w) => w.name).filter(Boolean));
+      const wbFiltered = onlyWatch ? wbRaw.filter((w) => matchWatch(w)) : wbRaw;
 
       const [adding, setAdding] = useState(null);   // 正在加入的 code（防重复点击）
       const quickAdd = async (code) => {
@@ -1624,7 +1633,7 @@ window.__ModuleLoader__.load({
               ariaLabel: '资讯类型',
               value: type,
               onChange: (t) => search(t, t === 'announcement' ? symbol.trim() : ''),
-              options: [{ value: 'news', label: '快讯' }, { value: 'lhb', label: '龙虎榜' }, { value: 'announcement', label: '公告' }],
+              options: [{ value: 'news', label: '快讯' }, { value: 'lhb', label: '龙虎榜' }, { value: 'announcement', label: '公告' }, { value: 'weibo', label: '微博' }],
             })),
           h('label', { className: 'htx-watchToggle', title: '只显示与自选股相关的条目（龙虎榜/公告按代码匹配，快讯按标题/摘要中的股票名称匹配）' },
             h('input', {
@@ -1637,15 +1646,21 @@ window.__ModuleLoader__.load({
               h('input', { className: 'htx-input', style: { width: 110 }, placeholder: '600519', value: symbol, onChange: (e) => setSymbol(e.target.value), onKeyDown: (e) => e.key === 'Enter' && search('announcement', symbol.trim()) }),
               h('button', { className: 'htx-btn htx-btnSm', onClick: () => search('announcement', symbol.trim()) }, '查询'))) : null,
           h('span', { className: 'htx-meta' },
-            `${data.value?.title || ''} ${onlyWatch ? `${filtered.length}/${items.length}` : items.length} 条`,
+            ...(type === 'weibo'
+              ? [`微博监控 ${onlyWatch ? `${wbFiltered.length}/${wbRaw.length}` : wbRaw.length}/${wbTotalN} 条`]
+              : [`${data.value?.title || ''} ${onlyWatch ? `${filtered.length}/${items.length}` : items.length} 条`]),
             onlyWatch && watch.loading ? ' · 自选加载中' : '',
             data.updatedAt ? ` · ${new Date(data.updatedAt).toLocaleTimeString('zh-CN', { hour12: false })}` : '',
             data.error ? h('span', { className: 'htx-metaWarn', title: `刷新失败：${data.error}` }, ' · 刷新失败') : null),
-          h(RefreshBtn, { busy: data.refreshing, onClick: () => data.reload() })),
+          h(RefreshBtn, { busy: type === 'weibo' ? wb.refreshing : data.refreshing, onClick: () => (type === 'weibo' ? wb.reload() : data.reload()) })),
 
-        data.error ? h(ErrorBox, { error: data.error }) : data.loading ? h(Spinner)
-          : !items.length ? h(Empty, { text: '暂无内容', hint: '换个类型或稍后再试' })
-          : onlyWatch && !filtered.length ? h(Empty, { text: '自选股相关的资讯暂无', hint: '关闭「只看自选」查看全部，或在自选股中加入更多个股' })
+        type === 'weibo' && wb.error ? h(ErrorBox, { error: `微博服务不可用：${wb.error}` })
+          : type === 'weibo' && wb.loading && !wbRaw.length ? h(Spinner)
+          : type === 'weibo' && !wbFiltered.length ? h(Empty, { text: '暂无微博', hint: '请确认 Weibo Crawler 服务已运行（默认 127.0.0.1:15001），或调整筛选' })
+          : type !== 'weibo' && data.error ? h(ErrorBox, { error: data.error })
+          : type !== 'weibo' && data.loading ? h(Spinner)
+          : type !== 'weibo' && !items.length ? h(Empty, { text: '暂无内容', hint: '换个类型或稍后再试' })
+          : type !== 'weibo' && onlyWatch && !filtered.length ? h(Empty, { text: '自选股相关的资讯暂无', hint: '关闭「只看自选」查看全部，或在自选股中加入更多个股' })
           : h('div', null,
 
             // ===== 龙虎榜：资金摘要 + 分歧图 + 聚合表 =====
@@ -1711,6 +1726,26 @@ window.__ModuleLoader__.load({
                     h('div', { className: 'htx-tlTitle' }, n.title || n.summary, tagFor(n.cat)),
                     n.summary && n.summary !== n.title ? h('div', { className: 'htx-tlSum' }, n.summary) : null)),
                 ]))) : null,
+
+            // ===== 微博：博主 chips + 互动数 + 时间轴 =====
+            type === 'weibo' ? h('div', null,
+              wbBloggers.length ? h('div', { className: 'htx-catChips' },
+                h('button', { type: 'button', className: 'htx-catChip', 'aria-pressed': wUser == null, onClick: () => setWUser(null) }, '全部博主', h('b', null, String(wbTotalN))),
+                wbBloggers.map((b) => h('button', {
+                  key: b.userId, type: 'button', className: 'htx-catChip',
+                  'aria-pressed': wUser === b.userId,
+                  onClick: () => setWUser(wUser === b.userId ? null : b.userId),
+                  title: `只看 @${b.name}`,
+                }, `@${b.name}`))) : null,
+              h('ul', { className: 'htx-tl' },
+                wbFiltered.map((w, i) => h('li', { key: w.id || i, className: wbWatchNames.has(w.screenName) ? 'reg' : '' },
+                  h('span', { className: 'htx-tlTime' }, (w.createdAt || '').slice(5, 16)),
+                  h('span', { className: 'htx-tlDot' }),
+                  h('div', { className: 'htx-tlTitle' },
+                    `@${w.screenName}`,
+                    h('span', { className: 'htx-reasonChip', title: '点赞/评论/转发' }, `赞${w.attitudes} 评${w.comments} 转${w.reposts}`),
+                    wbWatchNames.has(w.screenName) ? h('span', { className: 'htx-tag htx-tagReg' }, '已监控') : null),
+                  h('div', { className: 'htx-tlSum', style: { WebkitLineClamp: 4 } }, (w.text || '').replace(/\s+/g, ' ').trim()))))) : null,
 
             // ===== 公告：分类统计 chips + 分类标记列表 =====
             type === 'announcement' ? h('div', null,

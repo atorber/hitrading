@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { normalizeSymbols } from './lib/symbol.js';
 import { getQuotes } from './lib/quotes.js';
 import { openStore } from './lib/db.js';
+import { getWeibos } from './lib/weibo.js';
 import { runOp, strategies, TIERS, DOMAINS, PCT_N } from './lib/ops.js';
 
 const SKILL_PATH = new URL('./skills/hitrading/SKILL.md', import.meta.url);
@@ -127,6 +128,18 @@ function renderPowerful(v) {
   }
   lines.push('以上为市场数据，仅供研究参考，不构成投资建议。');
   return lines.join('\n');
+}
+
+function renderWeibo(v) {
+  if (v.error) return `HiTrading 微博查询失败：${v.error}`;
+  const items = v.items || [];
+  if (!items.length) return '未查询到微博。';
+  const lines = items.map((w, i) => {
+    const stats = `赞${w.attitudes} 评${w.comments} 转${w.reposts}`;
+    return `${i + 1}. [${w.createdAt}] @${w.screenName}（${stats}）\n   ${(w.text || '').replace(/\s+/g, ' ').slice(0, 100)}`;
+  });
+  const bloggers = v.bloggers?.length ? `\n监控博主：${v.bloggers.map((b) => b.name).join('、')}` : '';
+  return `微博监控（第 ${v.page} 页 / 共 ${v.total} 条）：\n${lines.join('\n')}${bloggers}\n以上为社交媒体内容，仅供参考，不构成投资建议。`;
 }
 
 function renderList(v, title, columns, emptyText) {
@@ -360,7 +373,23 @@ export function apply(ctx) {
     presentCall: (a) => ({ card: 'generic', title: '强势股', rawInput: a.date || '最新交易日' }),
   }));
 
-  // 8) 持仓
+  // 8) 微博监控
+  ctx.tools.register(defineTool({
+    name: 'hitrading_weibo',
+    description: '查询本地微博监控数据（Weibo Crawler 已入库的微博，按时间倒序）：支持按博主、关键词、近 N 天过滤，带点赞/评论/转发数。需本地已运行 Weibo Crawler 服务（默认 127.0.0.1:15001）。',
+    parameters: {
+      page: { type: 'integer', description: '页码，默认 1' },
+      pageSize: { type: 'integer', description: '每页条数 1~50，默认 30' },
+      userId: { type: 'string', description: '按博主 user_id 过滤（可选）' },
+      keyword: { type: 'string', description: '关键词过滤（可选）' },
+      days: { type: 'integer', description: '只看最近 N 天（可选）' },
+    },
+    output: { schema: { type: 'json' }, render: (_a, v) => [{ type: 'text', text: renderWeibo(v) }] },
+    execute: (args) => getWeibos(args),
+    presentCall: (a) => ({ card: 'generic', title: '微博监控', rawInput: a }),
+  }));
+
+  // 9) 持仓
   ctx.tools.register(defineTool({
     name: 'hitrading_portfolio',
     description: '管理本地持仓：记录持股数与成本价，查看实时市值与盈亏。数据持久化在本机，不连接券商。',
@@ -375,7 +404,7 @@ export function apply(ctx) {
     presentCall: (a) => ({ card: 'generic', title: '持仓管理', rawInput: a }),
   }));
 
-  // 9) 资讯
+  // 10) 资讯
   ctx.tools.register(defineTool({
     name: 'hitrading_news',
     description: '获取 A股资讯：快讯（news）、个股公告（announcement，需代码）、龙虎榜（lhb，全市场最近交易日）。',
@@ -389,7 +418,7 @@ export function apply(ctx) {
     presentCall: (a) => ({ card: 'generic', title: 'A股资讯', rawInput: a }),
   }));
 
-  // 10) 回测
+  // 11) 回测
   ctx.tools.register(defineTool({
     name: 'hitrading_backtest',
     description: '对单只 A股跑内置量化策略回测（双均线 / MACD / RSI 超买超卖），输出收益、回撤、夏普、胜率与最近交易。纯本地计算。',
@@ -408,7 +437,7 @@ export function apply(ctx) {
     presentCall: (a) => ({ card: 'generic', title: 'A股策略回测', rawInput: { symbol: a.symbol, strategy: a.strategy } }),
   }));
 
-  // 11) 预警
+  // 12) 预警
   ctx.tools.register(defineTool({
     name: 'hitrading_alert',
     description: '管理预警规则：创建、查看、删除。规则可设价格/涨跌幅阈值（GUI 内提醒，见后续定时器）。',
