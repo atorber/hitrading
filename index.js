@@ -250,19 +250,72 @@ export function apply(ctx) {
   };
 
   // 微博「提取股票」：用会话默认模型解析微博正文里的 A股标的
-  const pickModel = () => {
+  // 提取任务的路由选择：优先 DeepSeek 官方（deepseek-official / deepseek-account），
+  // 其次会话默认模型，最后第一个可用 Provider。可用带模型目录判断，避免选到空目录路由。
+  // 坏路由黑名单：认证失败的 provider 在本次进程内不再尝试
+  const badRoutes = new Set();
+  // 提取专用模型（GUI 选择器写入 weibo 表 'extractor:model'；null = 跟随默认模型）
+  const getExtractorModel = () => {
+    try { return tables.weibo.get('extractor:model') || null; } catch { return null; }
+  };
+  const pickModel = async () => {
+    const override = getExtractorModel();
+    if (override?.provider && override.model && !badRoutes.has(`${override.provider}/*`)) {
+      try {
+        await ctx.llm.resolveModelInfo(override.provider, override.model);
+        return { provider: override.provider, model: override.model, via: 'extractor-override' };
+      } catch { /* 覆盖路由不可用则继续正常选择链 */ }
+    }
+    const tryRoute = async (providerId, fallbackModel) => {
+      if (badRoutes.has(`${providerId}/*`)) return null;
+      const models = await ctx.llm.listModels(providerId).catch(() => []);
+      if (models.length) return { provider: providerId, model: (models.find((m) => m.id === fallbackModel) || models[0]).id };
+      if (fallbackModel) {
+        try {
+          await ctx.llm.resolveModelInfo(providerId, fallbackModel);
+          return { provider: providerId, model: fallbackModel };
+        } catch { /* 该路由不可用 */ }
+      }
+      return null;
+    };
+    const candidates = [];
     const def = ctx.get('agentDefaultModel');
     const sel = def && typeof def.currentSelection === 'function' ? def.currentSelection() : null;
-    if (sel?.provider && sel?.model) return { provider: sel.provider, model: sel.model };
-    const provider = (ctx.llm.listProviders() || [])[0];
-    if (!provider) throw new Error('没有可用的模型 Provider');
-    const model = (ctx.llm.listModels(provider.id) || [])[0];
-    if (!model) throw new Error(`Provider ${provider.id} 没有可用模型`);
-    return { provider: provider.id, model: model.id };
+    if (sel?.provider && sel?.model) candidates.push([sel.provider, sel.model]);
+    for (const p of ['deepseek-official', 'deepseek-account']) {
+      for (const m of ['deepseek-chat', 'deepseek-flash', 'deepseek-v4-pro']) candidates.push([p, m]);
+    }
+    for (const [providerId, modelId] of candidates) {
+      const hit = await tryRoute(providerId, modelId);
+      if (hit) return hit;
+    }
+    for (const provider of ctx.llm.listProviders() || []) {
+      const hit = await tryRoute(provider.id);
+      if (hit) return hit;
+    }
+    throw new Error('没有可用的模型 Provider（qianfan 需要 QIANFAN_API_KEY；deepseek-official 需要 DEEPSEEK_API_KEY 或账号登录）');
   };
 
   const llmText = async ({ system, user, maxTokens = 1500 }) => {
-    const route = pickModel();
+    let lastErr = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const route = await pickModel();
+      try {
+        return await llmTextOnce({ route, system, user, maxTokens });
+      } catch (e) {
+        lastErr = e;
+        // 认证类失败：把整个 provider 拉黑，换下一个候选路由
+        if (/api key|Authentication|MISSING_CREDENTIAL|INVALID_CREDENTIAL|ACCOUNT_SIGN_IN/i.test(String(e.message))) {
+          badRoutes.add(`${route.provider}/*`);
+          continue;
+        }
+        throw e;
+      }
+    }
+    throw lastErr || new Error('模型调用失败');
+  };
+
+  const llmTextOnce = async ({ route, system, user, maxTokens }) => {
     let text = '';
     let finish = null;
     const stream = ctx.llm.stream({
@@ -403,6 +456,35 @@ export function apply(ctx) {
       weiboTask.cancelRequested = true;
       saveWeiboTask(weiboTask);
       return { ...weiboTask, message: '已请求停止，当前批次结束后退出' };
+    },
+    'weibo.model.get': async () => ({ override: getExtractorModel() }),
+    'weibo.model.options': async () => {
+      const options = [];
+      const def = ctx.get('agentDefaultModel');
+      const sel = def && typeof def.currentSelection === 'function' ? def.currentSelection() : null;
+      for (const provider of ctx.llm.listProviders() || []) {
+        const models = await ctx.llm.listModels(provider.id).catch(() => []);
+        for (const m of models) {
+          options.push({
+            provider: provider.id, model: m.id, name: m.name || m.id,
+            isDefault: !!(sel && sel.provider === provider.id && sel.model === m.id),
+          });
+        }
+      }
+      return { options, defaultRoute: sel || null };
+    },
+    'weibo.model.set': async (args = {}) => {
+      const provider = String(args.provider || '').trim();
+      const model = String(args.model || '').trim();
+      if (!provider || !model) {
+        tables.weibo.put('extractor:model', null);
+        return { override: null, message: '已恢复为跟随默认模型' };
+      }
+      // 立即验证该路由可用
+      await ctx.llm.resolveModelInfo(provider, model);
+      const override = { provider, model };
+      tables.weibo.put('extractor:model', override);
+      return { override, message: `提取模型已设为 ${provider}/${model}` };
     },
     'weibo.stats': async (args = {}) => weiboExtractStats({ tables, sample: Number(args.sample) || 50 }),
   };

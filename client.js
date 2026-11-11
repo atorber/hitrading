@@ -279,6 +279,7 @@ window.__ModuleLoader__.load({
 .htx-lhbBar.buy{left:50%;background:linear-gradient(90deg,color-mix(in srgb,var(--dsw-alias-state-error-primary) 55%,transparent),var(--dsw-alias-state-error-primary))}
 .htx-lhbBar.sell{right:50%;background:linear-gradient(270deg,color-mix(in srgb,var(--dsw-alias-state-success-primary) 55%,transparent),var(--dsw-alias-state-success-primary))}
 .htx-lhbAmt{font-size:11.5px;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.htx-modelSel{width:auto;min-width:150px;font-size:11.5px;padding:4px 6px}
 .htx-btnWarn{border-color:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 55%,transparent);color:var(--dsw-alias-state-warn-primary)}
 .htx-tagExtracted{color:var(--dsw-alias-state-business-primary);background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 12%,transparent)}
 .htx-reasonChips{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
@@ -1862,6 +1863,9 @@ window.__ModuleLoader__.load({
     function WeiboView() {
       const [onlyWatch, setOnlyWatch] = useState(false);
       const [wUser, setWUser] = useState(null);
+      const modelOpts = useData(() => api('weibo.model.options'), []);
+      const modelCur = useData(() => api('weibo.model.get'), []);
+      const [savingModel, setSavingModel] = useState(false);
       const wb = useData(() => api('weibo', { pageSize: 50, ...(wUser ? { userId: wUser } : {}) }), [wUser], { refreshMs: 120_000 });
       // 提取任务：Host 侧后台运行，这里只轮询进度（离开页面也不会中断）
       const task = useData(() => api('weibo.task'), [], { refreshMs: 3_000 });
@@ -1874,6 +1878,21 @@ window.__ModuleLoader__.load({
       const bloggerNames = new Set(watchRows.map((w) => w.name).filter(Boolean));
       const filtered = onlyWatch ? raw.filter(matchWatch) : raw;
       const pending = raw.filter((w) => !w.extracted).length;
+
+      const setModel = async (value) => {
+        if (savingModel) return;
+        setSavingModel(true);
+        try {
+          if (!value) { const r = await api('weibo.model.set', {}); notifyOk(r.message || '已恢复默认'); }
+          else {
+            const [provider, model] = value.split('/');
+            const r = await api('weibo.model.set', { provider, model });
+            notifyOk(r.message || '已更新');
+          }
+          modelCur.reload();
+        } catch (e) { notifyError(`设置提取模型失败：${e.message}`); modelCur.reload(); }
+        finally { setSavingModel(false); }
+      };
 
       const extractStocks = async () => {
         if (running) { void api('weibo.cancel').then(() => task.reload()).catch(() => {}); return; }
@@ -1915,6 +1934,14 @@ window.__ModuleLoader__.load({
             onlyWatch && watch.loading ? ' · 自选加载中' : '',
             wb.updatedAt ? ` · ${new Date(wb.updatedAt).toLocaleTimeString('zh-CN', { hour12: false })}` : '',
             wb.error ? h('span', { className: 'htx-metaWarn', title: `刷新失败：${wb.error}` }, ' · 刷新失败') : null),
+          h('select', {
+            className: 'htx-input htx-modelSel', title: '提取任务使用的模型（后台任务专用，与对话框无关）',
+            disabled: savingModel || running,
+            value: (modelCur.value?.override ? `${modelCur.value.override.provider}/${modelCur.value.override.model}` : ''),
+            onChange: (e) => setModel(e.target.value),
+          },
+            h('option', { value: '' }, '跟随默认模型'),
+            (modelOpts.value?.options || []).map((o) => h('option', { key: `${o.provider}/${o.model}`, value: `${o.provider}/${o.model}` }, `${o.provider} · ${o.model}`))),
           h('button', {
             className: `htx-btn htx-btnSm ${running ? 'htx-btnWarn' : 'htx-btnPrimary'}`,
             title: running
