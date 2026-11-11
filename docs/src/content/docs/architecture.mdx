@@ -8,7 +8,7 @@ import Mermaid from '../../components/Mermaid.astro';
 HiTrading 是一个 Cordis bundle：Host 侧注册工具与路由，Client 侧注册侧栏图标与控制台，独立进程提供 HTTP 服务，三者共用一套操作实现。
 
 <Mermaid caption="Host / Client / 独立服务共用 lib/ops.js 单一真相源" code={`graph TD
-  A[Agent 对话] --> B[11 个 Host 工具]
+  A[Agent 对话] --> B[12 个 Host 工具]
   C[Web GUI 控制台] --> D[/api/hitrading 鉴权路由/]
   E[外部程序 Python / R] --> F[server.js :8099]
   B --> G[lib/ops.js 单一真相源]
@@ -21,7 +21,7 @@ HiTrading 是一个 Cordis bundle：Host 侧注册工具与路由，Client 侧�
 
 ```
 index.js            Host 入口：工具 + /api/hitrading 路由 + 定时器
-client.js           Client 入口：侧栏图标 + 11-Tab 控制台
+client.js           Client 入口：侧栏图标 + 14-Tab 控制台
 server.js           独立本地 HTTP 服务
 lib/ops.js          单一真相源：全部操作
 lib/db.js           SQLite 存储（WAL + 每小时备份）

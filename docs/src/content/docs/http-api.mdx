@@ -55,8 +55,16 @@ curl -s -X POST http://127.0.0.1:8099/api \
 | `portfolio.list` | 持仓（含市值盈亏） | — |
 | `portfolio.add` / `remove` | 建仓 / 清仓 | `symbol`、`shares`、`costPrice` |
 | `news` | 快讯/公告/龙虎榜 | `type`、`symbol`、`count` |
+| `weibo` | 微博列表（含提取标记） | `page`、`pageSize`、`userId`、`keyword`、`days` |
+| `weibo.extract` | 启动提取股票后台任务 | `batch`（1~50，默认 20）、`maxBatches` |
+| `weibo.task` / `weibo.cancel` | 查询任务进度 / 停止任务 | — |
+| `weibo.model.get` / `weibo.model.set` | 查询 / 设置提取专用模型 | `provider`、`model`（空则恢复跟随默认） |
 | `backtest` | 策略回测 | `symbol`、`strategy`、`limit`… |
 | `alerts.list` / `create` / `delete` | 预警规则 | `symbol`、`condition`、`value` |
+
+:::note
+`weibo.extract` / `weibo.task` / `weibo.cancel` / `weibo.model.*` 需要 Harness 内的模型通道，**独立 `:8099` 服务会明确拒绝**（返回错误提示）。提取任务请在控制台微博 Tab 点按钮，或对 Agent 说「把微博里提到的股票提取出来」。
+:::
 
 ## 示例：读取量能并落盘
 
