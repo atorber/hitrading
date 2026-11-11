@@ -211,6 +211,10 @@ window.__ModuleLoader__.load({
 .htx-tlSum{font-size:11.5px;color:var(--dsw-alias-label-tertiary);line-height:1.6;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .htx-tlDate{margin:10px 0 4px;font-size:11px;font-weight:600;color:var(--dsw-alias-label-tertiary);letter-spacing:.04em}
 .htx-tl>li:first-child .htx-tlDate{margin-top:0}
+.htx-watchToggle{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--dsw-alias-border-l3);border-radius:8px;background:var(--dsw-alias-bg-base);font:inherit;font-size:12px;color:var(--dsw-alias-label-secondary);cursor:pointer;user-select:none;white-space:nowrap}
+.htx-watchToggle:hover{color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-label-tertiary)}
+.htx-watchToggle:has(input:checked){border-color:var(--dsw-alias-state-business-primary);color:var(--dsw-alias-state-business-primary);background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 8%,transparent);font-weight:600}
+.htx-watchToggle input{accent-color:var(--dsw-alias-state-business-primary);margin:0;cursor:pointer}
 .htx-catChips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 12px}
 .htx-catChip{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px;border-radius:999px;border:1px solid var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-base);font:inherit;font-size:11.5px;color:var(--dsw-alias-label-secondary);cursor:pointer;line-height:1}
 .htx-catChip:hover{color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-label-tertiary)}
@@ -1340,9 +1344,20 @@ window.__ModuleLoader__.load({
       const [symbol, setSymbol] = useState('');
       const [run, setRun] = useState({ type: 'news', count: 30 });
       const [cat, setCat] = useState(null);            // 选中的分类 key（null = 全部）
+      const [onlyWatch, setOnlyWatch] = useState(false); // 只看自选相关
       const data = useData(() => api('news', run), [run]);
+      const watch = useData(() => api('watchlist.list'), [], { refreshMs: 60000 });
       const search = (t, sy) => { setType(t); setCat(null); setRun({ type: t, ...(sy ? { symbol: sy } : {}), count: 30 }); };
       const items = data.value?.items || [];
+      // 自选股匹配集合：代码 + 名称（快讯正文一般提名称不提代码）
+      const watchRows = watch.value?.items || [];
+      const watchByCode = new Map(watchRows.map((w) => [w.symbol, w]));
+      const matchWatch = (n) => {
+        if (n.code && watchByCode.has(String(n.code))) return true;
+        const text = `${n.title || ''}${n.summary || ''}`;
+        return watchRows.some((w) => w.name && w.name.length >= 2 && text.includes(w.name));
+      };
+      const itemsWatched = onlyWatch ? items.filter(matchWatch) : items;
 
       // —— 分类规则：先命中先归类 ——
       const NEWS_CATS = [
@@ -1367,7 +1382,7 @@ window.__ModuleLoader__.load({
       };
       const catLabel = (key) => (type === 'news' ? NEWS_CATS : ANN_CATS).find((c) => c.key === key)?.label || '其他';
       const catClass = (key) => (key === 'reg' ? 'htx-tagReg' : key === 'macro' ? 'htx-tagMacro' : key === 'mkt' ? 'htx-tagMkt' : 'htx-tagOther');
-      const withCat = items.map((n) => {
+      const withCat = itemsWatched.map((n) => {
         const c = classify(n);
         return { ...n, cat: c ? c.key : 'other', catLabel: c ? c.label : '其他' };
       });
@@ -1376,12 +1391,18 @@ window.__ModuleLoader__.load({
       const otherCount = withCat.filter((x) => x.cat === 'other').length;
       const filtered = cat ? withCat.filter((x) => x.cat === cat) : withCat;
 
+      const [adding, setAdding] = useState(null);   // 正在加入的 code（防重复点击）
       const quickAdd = async (code) => {
+        const c = String(code ?? '').trim();
+        if (!/^\d{6}$/.test(c)) { notifyError(`无效代码：${code}`); return; }
+        if (adding === c) return;                    // 同一只正在处理，忽略重复点击
+        setAdding(c);
         try {
-          const v = await api('watchlist.add', { symbols: [code] });
-          if (v.added?.length) notifyOk(`已加入自选：${code}`);
-          else notifyWarn(`${code} 已在自选`);
-        } catch (e) { notifyError(e.message); }
+          const v = await api('watchlist.add', { symbols: [c] });
+          if (v.added?.length) notifyOk(`已加入自选：${c}`);
+          else notifyWarn(`${c} 已在自选`);
+        } catch (e) { notifyError(`加入自选失败：${e.message}`); }
+        finally { setAdding(null); }
       };
       const yi = (v) => (v / 1e8).toFixed(2);
       const pct = (v) => (v == null ? '-' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`);
@@ -1390,7 +1411,7 @@ window.__ModuleLoader__.load({
       const lhbAgg = (() => {
         if (type !== 'lhb') return { rows: [], buyers: [], sellers: [], dates: [] };
         const map = new Map();
-        for (const it of items) {
+        for (const it of itemsWatched) {
           const cur = map.get(it.code);
           if (!cur) { map.set(it.code, { ...it, reasons: [it.reason || '—'] }); continue; }
           if (it.reason && !cur.reasons.includes(it.reason)) cur.reasons.push(it.reason);
@@ -1443,7 +1464,7 @@ window.__ModuleLoader__.load({
         { label: '总成交(亿)', render: (r) => ((r.buyAmt + r.sellAmt) / 2 / 1e8).toFixed(2), align: 'right' },
         { label: '换手%', render: (r) => r.turnover, align: 'right' },
         { label: '上榜原因', render: (r) => h('div', { className: 'htx-reasonChips' }, r.reasons.slice(0, 3).map((x, i) => h('span', { key: i, className: 'htx-reasonChip', title: x }, x.length > 18 ? x.slice(0, 17) + '…' : x))) },
-        { label: '', render: (r) => h('button', { className: 'htx-btn htx-btnSm', onClick: () => quickAdd(r.code) }, '+ 自选') },
+        { label: '', render: (r) => h('button', { className: 'htx-btn htx-btnSm', disabled: adding === String(r.code), onClick: () => quickAdd(r.code) }, adding === String(r.code) ? '加入中…' : '+ 自选') },
       ] : null;
       const [lhbSort, setLhbSort] = useState({ key: null, dir: null });
       const onLhbSort = (key) => setLhbSort((s0) => (s0.key !== key ? { key, dir: 'desc' } : s0.dir === 'desc' ? { key, dir: 'asc' } : { key: null, dir: null }));
@@ -1469,17 +1490,26 @@ window.__ModuleLoader__.load({
               onChange: (t) => search(t, t === 'announcement' ? symbol.trim() : ''),
               options: [{ value: 'news', label: '快讯' }, { value: 'lhb', label: '龙虎榜' }, { value: 'announcement', label: '公告' }],
             })),
+          h('label', { className: 'htx-watchToggle', title: '只显示与自选股相关的条目（龙虎榜/公告按代码匹配，快讯按标题/摘要中的股票名称匹配）' },
+            h('input', {
+              type: 'checkbox', checked: onlyWatch,
+              onChange: (e) => setOnlyWatch(e.target.checked),
+            }),
+            '只看自选'),
           type === 'announcement' ? h(Field, { label: '代码（可空）' },
             h('span', { style: { display: 'flex', gap: 4 } },
               h('input', { className: 'htx-input', style: { width: 110 }, placeholder: '600519', value: symbol, onChange: (e) => setSymbol(e.target.value), onKeyDown: (e) => e.key === 'Enter' && search('announcement', symbol.trim()) }),
               h('button', { className: 'htx-btn htx-btnSm', onClick: () => search('announcement', symbol.trim()) }, '查询'))) : null,
-          h('span', { className: 'htx-meta' }, `${data.value?.title || ''} ${items.length} 条`,
+          h('span', { className: 'htx-meta' },
+            `${data.value?.title || ''} ${onlyWatch ? `${filtered.length}/${items.length}` : items.length} 条`,
+            onlyWatch && watch.loading ? ' · 自选加载中' : '',
             data.updatedAt ? ` · ${new Date(data.updatedAt).toLocaleTimeString('zh-CN', { hour12: false })}` : '',
             data.error ? h('span', { className: 'htx-metaWarn', title: `刷新失败：${data.error}` }, ' · 刷新失败') : null),
           h(RefreshBtn, { busy: data.refreshing, onClick: () => data.reload() })),
 
         data.error ? h(ErrorBox, { error: data.error }) : data.loading ? h(Spinner)
           : !items.length ? h(Empty, { text: '暂无内容', hint: '换个类型或稍后再试' })
+          : onlyWatch && !filtered.length ? h(Empty, { text: '自选股相关的资讯暂无', hint: '关闭「只看自选」查看全部，或在自选股中加入更多个股' })
           : h('div', null,
 
             // ===== 龙虎榜：资金摘要 + 分歧图 + 聚合表 =====
@@ -1508,7 +1538,9 @@ window.__ModuleLoader__.load({
                     const w = `${(Math.abs(r.netBuyAmt) / maxAbs * 50).toFixed(1)}%`;
                     const buy = r.netBuyAmt > 0;
                     return h('div', {
-                      key: `${r.code}-${r.reason}`, className: 'htx-lhbRow', title: '点击加入自选',
+                      key: `${r.code}-${r.reason}`, className: 'htx-lhbRow',
+                      title: adding === String(r.code) ? '加入中…' : '点击加入自选',
+                      style: adding === String(r.code) ? { opacity: 0.55, cursor: 'wait' } : undefined,
                       onClick: () => quickAdd(r.code),
                     },
                       h('span', { className: 'htx-lhbName' }, r.name),
@@ -1557,7 +1589,7 @@ window.__ModuleLoader__.load({
                     h('span', { className: 'htx-badge htx-badgeFlat', style: { flex: 'none' }, title: n.code || '' }, `${n.name || n.code || '—'}`),
                     h('div', { style: { flex: 1, minWidth: 0 } },
                       h('div', { className: 'htx-tlTitle', style: { fontWeight: 500 } }, n.title, tagFor(n.cat))),
-                    h('button', { className: 'htx-btn htx-btnSm', style: { flex: 'none' }, onClick: () => quickAdd(n.code) }, '+ 自选')))))) : null));
+                    h('button', { className: 'htx-btn htx-btnSm', style: { flex: 'none' }, disabled: adding === String(n.code), onClick: () => quickAdd(n.code) }, adding === String(n.code) ? '加入中…' : '+ 自选')))))) : null));
     }
 
     // ---------- 预警 ----------
