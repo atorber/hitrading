@@ -114,6 +114,8 @@ curl -s "http://127.0.0.1:8099/api?op=energy&days=20"
 ```
 
 返回 `value.stats`：`date total delta ma5 rangeAvg rangeMax rangeMin pctSh pctCyb pctKc vsMa5Pct status`（金额单位：亿元；`status` 为 放量/平量/缩量，规则：最新合计较 5 日均额 ±10%）；
+`value.breadth`：`up down flat limitUp limitDown total upRatio`（当日涨跌家数与涨停跌停，数据源限流时缺省）；
+`value.sentiment`：`score label zone{key,label,sustained,hint} parts{amount,breadth,limit} latestAmount ma5Amount vsMa5Pct`——情绪评估（0-100）：量能40% + 涨跌家数35% + 涨停跌停25%；量能档位遵循「1万亿以下谨慎区、1.5万亿以上参与区（持续=强力做多，不持续=警惕头部）」；
 `value.series[]`：`date sh sz bj total delta ma5 pctSh pctCyb pctKc`（按日期升序，最后一条为最新交易日）。
 
 口径：沪市=上证指数成交额，深市=深证综指成交额，京市=北证50成分股成交额（北交所无全市场指数）；盘中最新一根为当日累计值。

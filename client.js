@@ -229,6 +229,21 @@ window.__ModuleLoader__.load({
 .htx-sumCard b{color:var(--dsw-alias-label-primary);font-weight:650}
 .htx-sumCard .htx-up,.htx-sumCard .htx-down{font-weight:650}
 .htx-lhbChart{display:flex;flex-direction:column;gap:7px;margin:2px 0 4px}
+/* 量能情绪仪表 */
+.htx-sentWrap{border:1px solid var(--dsw-alias-border-l3);border-radius:12px;padding:14px 16px;margin-bottom:12px;background:var(--dsw-alias-bg-base)}
+.htx-sentHead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.htx-sentScore{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.htx-sentZone{display:flex;height:10px;border-radius:5px;overflow:hidden;margin:8px 0 4px;position:relative}
+.htx-sentZoneSeg{height:100%}
+.htx-sentNeedle{position:absolute;top:-3px;width:2px;height:16px;background:var(--dsw-alias-label-primary);border-radius:1px;transition:left .4s}
+.htx-sentScale{display:flex;justify-content:space-between;font-size:10px;color:var(--dsw-alias-label-tertiary)}
+.htx-sentHints{margin:10px 0 0;font-size:11.5px;line-height:1.8;color:var(--dsw-alias-label-secondary)}
+.htx-sentHints b{color:var(--dsw-alias-label-primary)}
+.htx-sentHints .htx-warnText{color:var(--dsw-alias-state-warn-primary);font-weight:600}
+.htx-breadthBar{display:flex;height:16px;border-radius:5px;overflow:hidden;font-size:10px;line-height:16px;color:#fff;text-align:center;font-variant-numeric:tabular-nums}
+.htx-breadthUp{background:var(--dsw-alias-state-error-primary)}
+.htx-breadthFlat{background:var(--dsw-alias-border-l3);color:var(--dsw-alias-label-secondary)}
+.htx-breadthDown{background:var(--dsw-alias-state-success-primary)}
 .htx-lhbRow{display:grid;grid-template-columns:76px 1fr 76px;gap:10px;align-items:center;cursor:pointer;border-radius:8px;padding:2px 4px}
 .htx-lhbRow:hover{background:var(--dsw-alias-interactive-bg-hover)}
 .htx-lhbName{font-size:12px;font-weight:600;color:var(--dsw-alias-label-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1093,6 +1108,19 @@ window.__ModuleLoader__.load({
       const v = data.value || {};
       const series = v.series || [];
       const st = v.stats || {};
+      const sent = v.sentiment || null;     // 情绪评估（东财限流时可能缺）
+      const br = v.breadth || null;         // 涨跌家数
+
+      // 情绪指针位置：分数 0-100 映射到三段区条（0-1万 谨慎 | 1-1.5万 过渡 | 1.5万+ 参与）
+      // 用 8000~18000 亿量程把「当前合计额」定位到区条上；情绪分做指针颜色
+      const needlePct = (() => {
+        const a = st.total;
+        if (a == null) return null;
+        const lo = 8000, hi = 18000;
+        return Math.max(0, Math.min(100, ((a - lo) / (hi - lo)) * 100));
+      })();
+      const zoneColor = sent ? (sent.zone.key === 'caution' ? 'var(--dsw-alias-state-success-primary)' : sent.zone.key === 'neutral' ? 'var(--dsw-alias-state-warn-primary)' : 'var(--dsw-alias-state-error-primary)') : 'var(--dsw-alias-label-tertiary)';
+      const sentLabelCls = sent ? (sent.score >= 60 ? 'htx-up' : sent.score <= 35 ? 'htx-down' : '') : '';
 
       const columns = [
         { label: '日期', render: (r) => h('span', { style: { fontVariantNumeric: 'tabular-nums' } }, r.date) },
@@ -1152,6 +1180,51 @@ window.__ModuleLoader__.load({
         data.value == null
           ? (data.error ? h(ErrorBox, { error: data.error }) : h(Spinner))
           : h('div', null,
+            // ===== 情绪仪表（看长做短 · 量能是唯一参考指标）=====
+            sent ? h('div', { className: 'htx-sentWrap' },
+              h('div', { className: 'htx-sentHead' },
+                h('span', { className: 'htx-sentScore ' + sentLabelCls, title: '综合情绪分：量能40% + 涨跌家数35% + 涨停跌停25%' }, sent.score),
+                h('div', { style: { flex: 1 } },
+                  h('div', { style: { display: 'flex', alignItems: 'center', gap: 8 } },
+                    h('b', { style: { fontSize: 14 } }, sent.label),
+                    h('span', { className: 'htx-badge' + statusClass }, `量能${sent.zone.label}`)),
+                  h('div', { style: { fontSize: 11, color: 'var(--dsw-alias-label-tertiary)', marginTop: 2 } },
+                    `沪深京合计 ${yi(sent.latestAmount)} 亿 · 5日均 ${yi(sent.ma5Amount)} 亿（${pctStr(sent.vsMa5Pct)}）`))),
+              // 三档区条：谨慎区(0-1万) | 过渡区(1-1.5万) | 参与区(1.5万+)
+              needlePct != null ? h('div', null,
+                h('div', { className: 'htx-sentZone' },
+                  h('div', { className: 'htx-sentZoneSeg', style: { width: '20%', background: 'color-mix(in srgb, var(--dsw-alias-state-success-primary) 55%, transparent)' } }),
+                  h('div', { className: 'htx-sentZoneSeg', style: { width: '30%', background: 'color-mix(in srgb, var(--dsw-alias-state-warn-primary) 55%, transparent)' } }),
+                  h('div', { className: 'htx-sentZoneSeg', style: { width: '50%', background: 'color-mix(in srgb, var(--dsw-alias-state-error-primary) 45%, transparent)' } }),
+                  h('div', { className: 'htx-sentNeedle', style: { left: `calc(${needlePct.toFixed(1)}% - 1px)`, background: zoneColor } })),
+                h('div', { className: 'htx-sentScale' },
+                  h('span', null, '8千'),
+                  h('span', null, '1万亿 · 谨慎区线'),
+                  h('span', null, '1.5万亿 · 参与区线'),
+                  h('span', null, '1.8万亿+'))) : null,
+              // 涨跌家数对比条
+              br ? h('div', { style: { marginTop: 10 } },
+                h('div', { className: 'htx-breadthBar', title: `上涨 ${br.up} / 平盘 ${br.flat} / 下跌 ${br.down}` },
+                  h('div', { className: 'htx-breadthUp', style: { width: `${br.up / Math.max(1, br.total) * 100}%` } }, br.up),
+                  h('div', { className: 'htx-breadthFlat', style: { width: `${Math.max(2, br.flat / Math.max(1, br.total) * 100)}%` } }, br.flat),
+                  h('div', { className: 'htx-breadthDown', style: { width: `${br.down / Math.max(1, br.total) * 100}%` } }, br.down)),
+                h('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: 'var(--dsw-alias-label-tertiary)', marginTop: 3 } },
+                  h('span', { className: 'htx-up' }, `上涨 ${br.up}`),
+                  h('span', null, `平 ${br.flat}`),
+                  h('span', { className: 'htx-down' }, `下跌 ${br.down}`),
+                  h('span', null, `涨停 ${br.limitUp ?? '-'} · 跌停 ${br.limitDown ?? '-'}`))) : null,
+              // 操作参考（三档规则）
+              h('div', { className: 'htx-sentHints' },
+                h('b', null, '操作参考（看长做短）：'),
+                sent.zone.key === 'caution'
+                  ? h('span', null, '日均成交额 1 万亿以下，', h('span', { className: 'htx-warnText' }, '尽量减少仓位'), '，等待量能回暖。')
+                  : sent.zone.key === 'neutral'
+                    ? h('span', null, '量能 1 ~ 1.5 万亿过渡区，', h('b', null, '控制仓位'), '，观察量能能否站上 1.5 万亿。')
+                    : sent.zone.sustained
+                      ? h('span', null, '1.5 万亿以上且能持续——', h('b', { className: 'htx-up' }, '强力做多区'), '，赛道股结构性行情，可积极参与。')
+                      : h('span', null, '1.5 万亿以上但', h('span', { className: 'htx-warnText' }, '不能持续'), '——警惕短期头部，参与时控制节奏。'),
+                h('div', { style: { marginTop: 4, color: 'var(--dsw-alias-label-tertiary)' } }, '市场不断变化，量能指标不能绝对化，请结合市场环境灵活调整。本参考不构成投资建议。'))) : null,
+
             h('div', { className: 'htx-card' },
               h('div', { className: 'htx-row', style: { justifyContent: 'space-between', marginBottom: 10 } },
                 h('div', { className: 'htx-row', style: { margin: 0, gap: 8 } },
@@ -1168,7 +1241,10 @@ window.__ModuleLoader__.load({
                 metric('区间最低（亿）', yi(st.rangeMin)),
                 metric('上证涨跌', pctStr(st.pctSh), st.pctSh == null ? '' : st.pctSh >= 0 ? 'htx-up' : 'htx-down'),
                 metric('创业板涨跌', pctStr(st.pctCyb), st.pctCyb == null ? '' : st.pctCyb >= 0 ? 'htx-up' : 'htx-down'),
-                metric('科创50涨跌', pctStr(st.pctKc), st.pctKc == null ? '' : st.pctKc >= 0 ? 'htx-up' : 'htx-down')),
+                metric('科创50涨跌', pctStr(st.pctKc), st.pctKc == null ? '' : st.pctKc >= 0 ? 'htx-up' : 'htx-down'),
+                br ? metric('上涨家数', String(br.up), 'htx-up') : null,
+                br ? metric('下跌家数', String(br.down), 'htx-down') : null,
+                br ? metric('涨停 / 跌停', `${br.limitUp ?? '-'} / ${br.limitDown ?? '-'}`) : null),
 
               h(EnergyChart, { series }),
               h('p', { className: 'htx-chartNote' },
