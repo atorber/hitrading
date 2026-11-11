@@ -257,6 +257,15 @@ window.__ModuleLoader__.load({
 .htx-sentHints{margin:10px 0 0;font-size:11.5px;line-height:1.8;color:var(--dsw-alias-label-secondary)}
 .htx-sentHints b{color:var(--dsw-alias-label-primary)}
 .htx-sentHints .htx-warnText{color:var(--dsw-alias-state-warn-primary);font-weight:600}
+.htx-rulesList{margin:8px 0 0;padding:0;list-style:none}
+.htx-rulesList li{display:flex;gap:8px;align-items:flex-start;padding:5px 10px;border-radius:8px;font-size:12px;line-height:1.65;color:var(--dsw-alias-label-secondary)}
+.htx-rulesList li.hot{background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 9%,transparent);color:var(--dsw-alias-label-primary)}
+.htx-rulesList li .htx-ruleTag{flex:none;display:inline-flex;align-items:center;height:18px;padding:0 8px;border-radius:5px;font-size:10.5px;font-weight:650;line-height:1;white-space:nowrap;margin-top:1px}
+.htx-ruleCaution{color:var(--dsw-alias-state-success-primary);background:color-mix(in srgb,var(--dsw-alias-state-success-primary) 12%,transparent)}
+.htx-ruleNeutral{color:var(--dsw-alias-state-warn-primary);background:color-mix(in srgb,var(--dsw-alias-state-warn-primary) 14%,transparent)}
+.htx-ruleActive{color:var(--dsw-alias-state-error-primary);background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 12%,transparent)}
+.htx-rulesList li b{color:var(--dsw-alias-label-primary)}
+.htx-rulesList li .htx-warnText{color:var(--dsw-alias-state-warn-primary);font-weight:600}
 .htx-breadthBar{display:flex;height:16px;border-radius:5px;overflow:hidden;font-size:10px;line-height:16px;color:#fff;text-align:center;font-variant-numeric:tabular-nums}
 .htx-breadthUp{background:var(--dsw-alias-state-error-primary)}
 .htx-breadthFlat{background:var(--dsw-alias-border-l3);color:var(--dsw-alias-label-secondary)}
@@ -1270,17 +1279,25 @@ window.__ModuleLoader__.load({
                   h('span', null, `平 ${br.flat}`),
                   h('span', { className: 'htx-down' }, `下跌 ${br.down}`),
                   h('span', null, `涨停 ${br.limitUp ?? '-'} · 跌停 ${br.limitDown ?? '-'}`))) : null,
-              // 操作参考（三档规则）
+              // 操作参考：看长做短总纲 + 三档规则（当前档高亮）
               h('div', { className: 'htx-sentHints' },
-                h('b', null, '操作参考（看长做短）：'),
-                sent.zone.key === 'caution'
-                  ? h('span', null, '日均成交额 1 万亿以下，', h('span', { className: 'htx-warnText' }, '尽量减少仓位'), '，等待量能回暖。')
-                  : sent.zone.key === 'neutral'
-                    ? h('span', null, '量能 1 ~ 1.5 万亿过渡区，', h('b', null, '控制仓位'), '，观察量能能否站上 1.5 万亿。')
-                    : sent.zone.sustained
-                      ? h('span', null, '1.5 万亿以上且能持续——', h('b', { className: 'htx-up' }, '强力做多区'), '，赛道股结构性行情，可积极参与。')
-                      : h('span', null, '1.5 万亿以上但', h('span', { className: 'htx-warnText' }, '不能持续'), '——警惕短期头部，参与时控制节奏。'),
-                h('div', { style: { marginTop: 4, color: 'var(--dsw-alias-label-tertiary)' } }, '市场不断变化，量能指标不能绝对化，请结合市场环境灵活调整。本参考不构成投资建议。'))) : null,
+                h('div', { style: { marginBottom: 2 } },
+                  h('b', null, '看长做短，量能是唯一参考指标。'),
+                  '当前档位：',
+                  h('b', { className: sent.zone.key === 'caution' ? 'htx-down' : sent.zone.key === 'active' ? 'htx-up' : '' },
+                    sent.zone.label),
+                  sent.zone.sustained ? '（持续）' : ''),
+                h('ul', { className: 'htx-rulesList' },
+                  h('li', { className: sent.zone.key === 'caution' ? 'hot' : '' },
+                    h('span', { className: 'htx-ruleTag htx-ruleCaution' }, '谨慎区'),
+                    h('span', null, '日均成交额 ', h('b', null, '1 万亿以下'), '——', h('span', { className: sent.zone.key === 'caution' ? 'htx-warnText' : '' }, '尽量减少仓位'), '。')),
+                  h('li', { className: sent.zone.key === 'neutral' ? 'hot' : '' },
+                    h('span', { className: 'htx-ruleTag htx-ruleNeutral' }, '过渡区'),
+                    h('span', null, h('b', null, '1.5 万亿以上'), '是', h('b', null, '适度参与区'), '，赛道股结构性行情。')),
+                  h('li', { className: sent.zone.key === 'active' ? 'hot' : '' },
+                    h('span', { className: 'htx-ruleTag htx-ruleActive' }, '参与区'),
+                    h('span', null, h('b', null, '1.5 万亿以上'), '，能持续是', h('b', null, '强力做多区'), '；不能持续则', h('span', { className: sent.zone.key === 'active' && !sent.zone.sustained ? 'htx-warnText' : '' }, '警惕短期头部'), '。'))),
+                h('div', { style: { marginTop: 6, color: 'var(--dsw-alias-label-tertiary)' } }, '市场不断变化，量能指标也不能绝对化，根据市场变化做调整。本参考不构成投资建议。'))) : null,
 
             h('div', { className: 'htx-card' },
               h('div', { className: 'htx-row', style: { justifyContent: 'space-between', marginBottom: 10 } },
