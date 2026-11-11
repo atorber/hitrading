@@ -1,12 +1,12 @@
 ---
 name: hitrading
 description: >-
-  A股行情、个股技术面分析、选股筛选、自选股与持仓管理、策略回测、资讯/公告/龙虎榜。
+  A股行情、个股技术面分析、选股筛选、自选股与持仓管理、策略回测、快讯/公告/龙虎榜/微博。
   Use this skill when the user asks about Chinese A-share (沪深 A股) data: realtime
   quotes for a stock code like 600519/000001, K-line history, MA/MACD/RSI/KDJ
   indicators, screening stocks by PE/market-cap/change/turnover, managing a
   watchlist or portfolio, running a moving-average/MACD/RSI backtest, or reading
-  A-share news, announcements and 龙虎榜. Data and analysis only — never places
+  A-share news flashes, announcements, 龙虎榜 and Weibo monitoring. Data and analysis only — never places
   real brokerage orders.
 metadata:
   author: hitrading
@@ -153,7 +153,7 @@ curl -s "http://127.0.0.1:8099/api?op=weibo&keyword=DRAM&days=3"
 返回 `value.items[]`：`id screenName text createdAt attitudes comments reposts extracted{at,stocks[]}`；
 `extract` 返回 `processed pendingLeft withStocks added[] updated[] message`。
 
-### news — 资讯 / 公告 / 龙虎榜
+### news — 快讯 / 公告 / 龙虎榜
 
 参数：`type`（`news`/`announcement`/`lhb`，必填）、`symbol`（公告可按代码过滤）、`count`（1~50，默认 20）
 
