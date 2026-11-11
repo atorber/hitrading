@@ -1,7 +1,7 @@
 {
   "name": "@atorber/hitrading",
   "version": "1.0.0",
-  "description": "HiTrading — A股投资助手插件（DeepSeek Harness）：11 个 Agent 工具 + 11-Tab 交互控制台（行情自选/量能/强势股/选股/持仓/回测/资讯/预警/Agent 技能/API/使用说明），SQLite 持久化，纯分析不下单。",
+  "description": "HiTrading — A股投资助手插件（DeepSeek Harness）：12 个 Agent 工具 + 14-Tab 交互控制台（行情自选/量能/强势股/选股/持仓/回测/快讯/公告/微博/龙虎榜/预警/Agent 技能/API/使用说明），SQLite 持久化，纯分析不下单。",
   "type": "module",
   "exports": {
     ".": "./index.js",

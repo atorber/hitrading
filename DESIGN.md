@@ -7,7 +7,7 @@
 
 HiTrading 是运行在当前 DeepSeek Harness 内的 **Cordis 插件**，为 Agent 与用户提供 A股（沪深）投资辅助能力：
 
-- **Agent 侧**：注册一组 A股工具（行情、K线、分析、选股、自选/持仓、资讯、回测、预警），Agent 在对话中按需调用。
+- **Agent 侧**：注册一组 A股工具（行情、K线、分析、选股、自选/持仓、快讯/公告/龙虎榜、微博、回测、预警），Agent 在对话中按需调用。
 - **UI 侧**：在 Web GUI 挂出面板与工具结果可视化（K线图、数据表、自选/持仓列表）。
 - **定位**：纯分析与跟踪，**不连接券商、不真实下单**；所有结论附投资风险提示。
 
@@ -150,5 +150,5 @@ hitrading/                      # 单个 bundle 包 @atorber/hitrading（GitHub:
 - 全部 11 个工具 + 持久化 domain + 预警定时器 + sidebar 面板已实现并端到端验证；数据源为腾讯/新浪行情 + 新浪K线/列表 + 东财 push2/push2his/push2ex（量能、强势股、龙虎榜/公告/快讯）。强势股按日缓存进 SQLite（powerful 表）：历史日首次访问扫描全市场日K（约 20 秒）后落盘，之后秒出。
 - **本地 bundle 的 @deepseek-ai 依赖解析**：Host 侧 import 了 `dsh-tools`（工具定义）。registry 只有旧版（0.0.1-rc.1），与运行时（0.2.2-rc.1）不一致，不可写成 npm 依赖；本地 `link:` 安装下 ESM 从插件真实路径解析，需在插件目录建指向 DSH 安装树的 `node_modules/@deepseek-ai` 软链（详见 README「本地开发注意」）。
 - **预警触达**：一期为「面板/工具列表可见触发状态」——`ctx.timer` 轮询（交易时段）检测规则，触发后写 `triggered` + `lastTriggeredAt` 到 domain；`hitrading_alert list` 与面板可见「已触发」。弹窗式提醒与实时面板数据需 Host→Client 数据通道（`useResource`/Remote），列为后续增强。
-- **面板定位**：client 侧注册 `sidebar.panellist`（图标）+ `main`（key=`hitrading` 页面，keyed slot），经 `Slots.listSubTree` 验证 `hitrading` occupant 已激活。**已从「说明导航页」升级为 11-Tab 交互控制台**（行情自选/量能/强势股/选股/持仓/回测/资讯/预警/Agent 技能/API/使用说明）：Host 把 11 个操作抽成单一真相源 `lib/ops.js`，并经 `ctx.connection.fetch.register` 暴露鉴权路由 `/api/hitrading`（GET/POST，JSON）；client 端各视图通过同源 `fetch('/api/hitrading')` 实时读写，含 K线图（SVG）、权益曲线图、表单与增删交互。
+- **面板定位**：client 侧注册 `sidebar.panellist`（图标）+ `main`（key=`hitrading` 页面，keyed slot），经 `Slots.listSubTree` 验证 `hitrading` occupant 已激活。**已从「说明导航页」升级为 14-Tab 交互控制台**（行情自选/量能/强势股/选股/持仓/回测/快讯/公告/微博/龙虎榜/预警/Agent 技能/API/使用说明）：Host 把 11 个操作抽成单一真相源 `lib/ops.js`，并经 `ctx.connection.fetch.register` 暴露鉴权路由 `/api/hitrading`（GET/POST，JSON）；client 端各视图通过同源 `fetch('/api/hitrading')` 实时读写，含 K线图（SVG）、权益曲线图、表单与增删交互。
 - **跨进程共享与外部接入**：持久化由 storage-domain 改为 **SQLite（`node:sqlite`，WAL）** `~/.dsh/storages/hitrading.db`，插件/面板/独立服务三方共享；独立服务 `server.js` 暴露同一套 op 的 HTTP API（默认 `127.0.0.1:8099`）。其他 Agent 通过 `skills/hitrading/SKILL.md`（`install-skill.sh` 可一键装到 `~/.agents/skills`、`~/.claude/skills`、`~/.cursor/skills`；或 `GET /skill.md` 拉取）接入；`hitrading` skill 已在本机三个目录安装成功。
