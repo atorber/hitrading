@@ -181,6 +181,23 @@ window.__ModuleLoader__.load({
 .htx-inlineUp{color:var(--dsw-alias-state-error-primary)}
 .htx-inlineDown{color:var(--dsw-alias-state-success-primary)}
 
+/* 股票池方法论说明卡（可折叠） */
+.htx-methodCard{border:1px solid var(--dsw-alias-border-l3);border-radius:12px;margin-bottom:12px;background:var(--dsw-specific-sidebar-fill);overflow:hidden}
+.htx-methodHead{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;padding:9px 14px;border:none;background:0 0;font:inherit;font-size:12.5px;font-weight:650;color:var(--dsw-alias-label-primary);cursor:pointer;text-align:left}
+.htx-methodHead:hover{color:var(--dsw-alias-state-business-primary)}
+.htx-methodHead .htx-methodArrow{margin-left:auto;font-size:10px;color:var(--dsw-alias-label-tertiary);transition:transform .2s}
+.htx-methodHead[aria-expanded=true] .htx-methodArrow{transform:rotate(90deg)}
+.htx-methodBody{padding:2px 16px 12px;font-size:12px;line-height:1.75;color:var(--dsw-alias-label-secondary)}
+.htx-methodBody h4{margin:10px 0 4px;font-size:12px;font-weight:650;color:var(--dsw-alias-label-primary)}
+.htx-methodBody ol{margin:4px 0;padding-inline-start:1.4em}
+.htx-methodBody li{margin-bottom:3px}
+.htx-methodBody b{color:var(--dsw-alias-label-primary);font-weight:650}
+.htx-methodBody .htx-methodTip{margin-top:8px;padding:7px 10px;border-radius:8px;background:color-mix(in srgb,var(--dsw-alias-state-business-primary) 8%,transparent);font-size:11.5px}
+.htx-tierChain{display:flex;align-items:center;gap:6px;margin:6px 0;flex-wrap:wrap}
+.htx-tierChain .htx-tierNode{display:inline-flex;align-items:center;height:22px;padding:0 10px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid var(--dsw-alias-border-l3);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-secondary)}
+.htx-tierChain .htx-tierNode.hot{border-color:color-mix(in srgb,var(--dsw-alias-state-error-primary) 45%,transparent);color:var(--dsw-alias-state-error-primary);background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 8%,transparent)}
+.htx-tierChain .htx-tierArrow{color:var(--dsw-alias-label-tertiary);font-size:11px}
+
 /* 强势股：左侧日期导航 + 右侧内容 */
 .htx-dateNav{flex:none;width:168px;box-sizing:border-box;display:flex;flex-direction:column;gap:4px;padding:8px;border:1px solid var(--dsw-alias-border-l3);border-radius:12px;background:var(--dsw-specific-sidebar-fill);align-self:flex-start}
 .htx-dateNavBtn{display:flex;align-items:center;gap:6px;width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid transparent;border-radius:9px;background:0 0;font:inherit;font-size:12px;color:var(--dsw-alias-label-secondary);cursor:pointer;text-align:left;white-space:nowrap}
@@ -306,6 +323,44 @@ window.__ModuleLoader__.load({
     function Spinner() { return h('div', { className: 'htx-empty' }, '加载中…'); }
     function ErrorBox({ error }) { return error ? h('div', { className: 'htx-error' }, String(error)) : null; }
     function Empty({ text }) { return h('div', { className: 'htx-empty' }, text); }
+    /** 股票池方法论说明卡（可折叠，默认收起）。 */
+    function MethodCard() {
+      const [open, setOpen] = useState(false);
+      const li = (children) => h('li', { key: undefined }, children);
+      return h('div', { className: 'htx-methodCard' },
+        h('button', {
+          type: 'button', className: 'htx-methodHead',
+          'aria-expanded': open, onClick: () => setOpen(!open),
+        },
+          '📈 如何构建自己的股票池？',
+          h('span', { className: 'htx-methodArrow' }, '▶')),
+        open ? h('div', { className: 'htx-methodBody' },
+          h('p', { style: { margin: '4px 0 6px' } }, '全面注册制后 A股快速扩容，面对近 6000 家上市公司，投资者无所适从。构建适合自己能力圈的股票池，核心是 ', h('b', null, '做减法'), '。'),
+          h('h4', null, '一、行业上必须做减法'),
+          h('p', { style: { margin: '2px 0' } }, '只聚焦少数景气度向上的行业——选择比努力更重要，自上而下，选对行业事半功倍：清除长期趋势下行的房地产、基建、建材、装饰装修、家居、钢铁等；必选消费只看创新药，可选消费只看新消费；周期行业只看能源金属与战略金属。'),
+          h('h4', null, '二、好行业选好公司'),
+          h('p', { style: { margin: '2px 0' } }, '专注取舍，聚焦比发散更重要——减法是做任何事成功的保障，贪多嚼不烂。'),
+          h('h4', null, '三、三级股票池，层层选拔'),
+          h('div', { className: 'htx-tierChain' },
+            h('span', { className: 'htx-tierNode' }, '基础股票池'),
+            h('span', { className: 'htx-tierArrow' }, '→'),
+            h('span', { className: 'htx-tierNode' }, '精选股票池'),
+            h('span', { className: 'htx-tierArrow' }, '→'),
+            h('span', { className: 'htx-tierNode hot' }, '交易股票池')),
+          h('ol', null,
+            h('li', null, h('b', null, '基础股票池'), '：基于券商研报与个股公开信息（公告、投资者互动、官网等）初步筛选，参考来源「专业证券分析」微博。'),
+            h('li', null, h('b', null, '精选股票池'), '：在基础池内精选——交易频率高选弹性大的标的，频率低选行业龙头。'),
+            h('li', null, h('b', null, '交易股票池'), '：纳入交易范围或本身就是持仓股，结合历史走势与基本面多方研判。')),
+          h('h4', null, '四、深度跟踪'),
+          h('p', { style: { margin: '2px 0' } }, '层层选拔后要深度了解交易股票，跟踪基本面变化，实时评估驱动力。'),
+          h('h4', null, '五、动态更新'),
+          h('p', { style: { margin: '2px 0' } }, '剔除基本面瑕疵、业绩下修、股东大幅减持、重组目的不纯、炒作过度等股票。'),
+          h('h4', null, '六、日日更新'),
+          h('p', { style: { margin: '2px 0' } }, '每天阅读「专业证券分析」「财富密钥」微博内容，随手更新股票池。'),
+          h('div', { className: 'htx-methodTip' },
+            '💡 小技巧：学会用大模型提问，提升选股和甄别能力。构建股票池是专业和成熟的标志。')) : null);
+    }
+
     /** 手动刷新小按钮：拉取中图标旋转。 */
     function RefreshBtn({ onClick, busy = false, label = '立即刷新' }) {
       return h('button', {
@@ -883,6 +938,8 @@ window.__ModuleLoader__.load({
             list.error ? h('span', { className: 'htx-metaWarn', title: `刷新失败：${list.error}` }, ' · 刷新失败') : null),
           h(RefreshBtn, { busy: list.refreshing, onClick: () => list.reload() }),
         ),
+        // 股票池方法论说明卡（可折叠）
+        h(MethodCard),
         // 领域快速筛选：单选切换（与表头 ColFilter 共享 domainSel）
         h('div', { className: 'htx-chipRow' },
           h('span', { className: 'htx-tagCloudLabel' }, '领域'),
